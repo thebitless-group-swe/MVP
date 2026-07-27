@@ -1,0 +1,18 @@
+# Secrets
+.env
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.uv/
+
+# OS
+.DS_Store
+Thumbs.db
+
