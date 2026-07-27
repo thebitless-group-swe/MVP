@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PoC — Pipeline LLM streaming end-to-end
 
 Proof of Concept per validare la pipeline LLM streaming end-to-end contro un provider LiteLLM (compatibile OpenAI).
@@ -44,3 +45,6 @@ Rigenerare i tipi TypeScript dall'OpenAPI (richiede API in esecuzione su `localh
 cd web
 pnpm types:gen
 ```
+=======
+# MVP
+>>>>>>> origin/main
