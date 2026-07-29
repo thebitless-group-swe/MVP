@@ -23,6 +23,7 @@ import {
   useIsGenerating,
   useStreamedOutput,
 } from '@/store/useEditorStore'
+import { useAiStream } from '@/hooks/useAiStream'
 
 // Stessa union del contratto: la deriviamo invece di riscriverla.
 type Length = GenerateRequest['length']
@@ -57,12 +58,7 @@ export function GenerateModal() {
   const errorMessage = useErrorMessage()
   const displayed = useTypewriter(streamedOutput, isGenerating)
 
-  const controllerRef = useRef<AbortController | null>(null)
-
-  const abort = () => {
-    controllerRef.current?.abort()
-    controllerRef.current = null
-  }
+  const { start, abort } = useAiStream()
 
   const currentSnapshot = (): GenerateParams =>
     mode === 'link'
@@ -81,56 +77,6 @@ export function GenerateModal() {
   const sameAsLast =
     lastParams !== null && paramsEqual(lastParams, currentSnapshot())
 
-  const runStream = async (snapshot: GenerateParams) => {
-    abort()
-    const controller = new AbortController()
-    controllerRef.current = controller
-
-    const store = useEditorStore.getState()
-    store.startStreaming()
-    useEditorStore.setState({ errorMessage: null })
-
-    const endpoint =
-      snapshot.mode === 'link' ? GENERATE_LINK_ENDPOINT : GENERATE_ENDPOINT
-    // In modalità link il body è un LinkRequest, altrimenti un GenerateRequest.
-    // Ordine delle chiavi invariato per non cambiare l'output JSON.
-    const body: LinkRequest | GenerateRequest =
-      snapshot.mode === 'link'
-        ? { url: snapshot.url, length: snapshot.length }
-        : { prompt: snapshot.prompt, length: snapshot.length }
-
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => null)
-        useEditorStore
-          .getState()
-          .setError(errBody?.detail ?? `Errore ${response.status}`)
-        return
-      }
-
-      const reader = response.body!.getReader()
-      for await (const chunk of parseSseStream(reader)) {
-        // Dopo un abort, scarta i chunk già bufferizzati per non ri-popolare
-        // streamedOutput appena azzerato.
-        if (controller.signal.aborted) break
-        useEditorStore.getState().appendChunk(chunk)
-      }
-      useEditorStore.getState().finishStreaming()
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        useEditorStore.getState().finishStreaming()
-        return
-      }
-      useEditorStore.getState().setError('Errore di connessione')
-    }
-  }
 
   const canGenerate =
     !isGenerating &&
@@ -139,7 +85,13 @@ export function GenerateModal() {
   const handleGenerate = () => {
     const snapshot = currentSnapshot()
     setLastParams(snapshot)
-    void runStream(snapshot)
+    useEditorStore.setState({ streamedOutput: '', errorMessage: null })
+    const endpoint = snapshot.mode === 'link' ? GENERATE_LINK_ENDPOINT : GENERATE_ENDPOINT
+    const body =
+      snapshot.mode === 'link'
+        ? { url: snapshot.url, length: snapshot.length } as LinkRequest
+        : { prompt: snapshot.prompt, length: snapshot.length } as GenerateRequest
+    void start({ endpoint, body })
   }
 
   const handleDiscard = () => {

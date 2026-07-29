@@ -46,6 +46,9 @@ interface EditorState {
   notes: NotesSlice
   editorView: EditorView | null
   setEditorView: (view: EditorView | null) => void
+  _abortController: AbortController | null
+  _setAbortController: (controller: AbortController | null) => void
+  abortStream: () => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -136,7 +139,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     },
   },
   editorView: null,
-  setEditorView: (view) => set({ editorView: view })
+  setEditorView: (view) => set({ editorView: view }),
+
+  _abortController: null,
+  _setAbortController: (c) => set({ _abortController: c }),
+  abortStream: () => {
+    get()._abortController?.abort()
+    set({_abortController: null})
+  },
 }))
 
 // V9: selettore atomico — non esporre mai oggetti compositi

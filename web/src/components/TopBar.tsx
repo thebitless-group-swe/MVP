@@ -8,7 +8,6 @@ import {
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { useLlmStream } from '@/hooks/useLlmStream'
 import { useCurrentNote } from '@/store/notes'
 import {
   useAiModal,
@@ -41,12 +40,13 @@ export interface TopBarProps {
 }
 
 export function TopBar({ noteTitle }: TopBarProps) {
-  const { abort } = useLlmStream()
   const isGenerating = useIsGenerating()
   const errorMessage = useErrorMessage()
   const aiModal = useAiModal()
   const currentNote = useCurrentNote()
-  const showStreamingUi = isGenerating && aiModal === null
+  const showStreamingUi = isGenerating
+
+  const handleAbort = () => useEditorStore.getState().abortStream()
 
   // Titolo reattivo: prop esplicita > nota corrente > fallback.
   const displayTitle = noteTitle ?? currentNote?.title ?? 'Nota senza titolo'
@@ -120,7 +120,7 @@ export function TopBar({ noteTitle }: TopBarProps) {
               type="button"
               variant="destructive"
               size="sm"
-              onClick={abort}
+              onClick={handleAbort}
               aria-label="Interrompi generazione in corso"
             >
               Interrompi

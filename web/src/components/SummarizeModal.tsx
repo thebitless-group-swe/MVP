@@ -11,7 +11,7 @@ import rehypeHighlight from 'rehype-highlight'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { useLlmStream } from '@/hooks/useLlmStream'
+import { useAiStream } from '@/hooks/useAiStream'
 import { useTypewriter } from '@/hooks/useTypewriter'
 import { getActiveText } from '@/lib/aiActions'
 import { cn } from '@/lib/utils'
@@ -32,6 +32,10 @@ const LENGTHS: { value: Length; label: string }[] = [
   { value: 'dettagliato', label: 'Dettagliato' },
 ]
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+const SUMMARIZE_ENDPOINT = `${API_BASE_URL}/summarize`
+const MIN_TEXT_LENGTH = 10
+
 type SummarizeParams = { text: string; length: Length }
 
 export function SummarizeModal() {
@@ -41,7 +45,7 @@ export function SummarizeModal() {
   const [length, setLength] = useState<Length>('medio')
   const [lastParams, setLastParams] = useState<SummarizeParams | null>(null)
 
-  const { start, abort } = useLlmStream()
+  const { start, abort } = useAiStream()
   const streamedOutput = useStreamedOutput()
   const isGenerating = useIsGenerating()
   const errorMessage = useErrorMessage()
@@ -53,12 +57,14 @@ export function SummarizeModal() {
     lastParams.text === currentText &&
     lastParams.length === length
 
+  const canSummarize = !isGenerating && getActiveText().trim().length >= MIN_TEXT_LENGTH
+
   const handleGenerate = () => {
     abort()
     const snapshot: SummarizeParams = { text: getActiveText(), length }
     setLastParams(snapshot)
     useEditorStore.setState({ streamedOutput: '', errorMessage: null })
-    start(snapshot.text, snapshot.length)
+   void start({ endpoint: SUMMARIZE_ENDPOINT, body: { text: snapshot.text, length: snapshot.length } })
   }
 
   const handleCancel = () => {
@@ -150,8 +156,8 @@ export function SummarizeModal() {
                 type="button"
                 size="sm"
                 onClick={handleGenerate}
-                disabled={isGenerating}
-                aria-disabled={isGenerating}
+                disabled={!canSummarize}
+                aria-disabled={!canSummarize}
               >
                 {sameAsLast ? 'Rigenera' : 'Genera'}
               </Button>
