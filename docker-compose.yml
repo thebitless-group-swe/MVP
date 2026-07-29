@@ -1,0 +1,30 @@
+services:
+  web:
+    build: ./web
+    ports:
+      - "5173:5173"
+    environment:
+      # Base URL del backend per la fetch cross-origin del frontend (browser -> :8000).
+      - VITE_API_BASE_URL=http://localhost:8000
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    networks:
+      - second-brain-net
+
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    env_file:
+      - .env
+    networks:
+      - second-brain-net
+
+networks:
+  second-brain-net:
+    driver: bridge

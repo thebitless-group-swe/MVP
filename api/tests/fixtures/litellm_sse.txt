@@ -1,0 +1,10 @@
+data: {"id":"chatcmpl-6bb221c6-f314-45b9-a909-1572895a20e2","created":1780226738,"model":"gemma3:1b","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Ciao","role":"assistant"}}]}
+
+data: {"id":"chatcmpl-0dbb0215-9137-4eaf-8af4-44e641d3caa8","created":1780226738,"model":"gemma3:1b","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" mondo"}}]}
+
+data: {"id":"chatcmpl-f6e04386-3e5d-4b9d-b0d0-97fbffca0056","created":1780226738,"model":"gemma3:1b","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"\n"}}]}
+
+data: {"id":"chatcmpl-f6e04386-3e5d-4b9d-b0d0-97fbffca0056","created":1780226738,"model":"gemma3:1b","object":"chat.completion.chunk","choices":[{"finish_reason":"stop","index":0,"delta":{}}]}
+
+data: [DONE]
+
