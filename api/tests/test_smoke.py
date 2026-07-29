@@ -1,4 +1,4 @@
-from api.tests.conftest import DummyLLMClient
+from tests.conftest import DummyLLMClient
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 
