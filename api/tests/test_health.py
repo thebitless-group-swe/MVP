@@ -41,7 +41,8 @@ class TestHealthEndpoint:
         assert response.json()["model"] == "test-model-override"
 
     def test_health_shape_solo_status_e_model(self, client: TestClient) -> None:
-        """Il body contiene solo `status` e `model`: niente campi extra che potrebbero leakare configurazione."""
+        """Il body contiene solo `status` e `model`: niente campi extra che
+        potrebbero leakare configurazione."""
         response = client.get("/")
 
         body = response.json()
