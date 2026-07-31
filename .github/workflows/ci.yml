@@ -51,6 +51,8 @@ jobs:
 
       - name: Installa pnpm
         uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
 
       - name: Installa Node
         uses: actions/setup-node@v4
