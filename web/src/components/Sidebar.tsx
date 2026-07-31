@@ -22,18 +22,30 @@ export function Sidebar() {
   const updateCurrent = useNotesStore((s) => s.updateCurrent)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [fileError, setFileError] = useState<string | null>(null)
 
   async function handleOpenFile() {
-    const note = await openNoteFromFile()
-    if (!note) return
-    loadNote(note)
-    useEditorStore.getState().setCurrentText(note.content)
+    setFileError(null)
+    try{
+      const note = await openNoteFromFile()
+      if (!note) return
+      loadNote(note)
+    } catch (err) {
+      if (err != null && (err as { name?: string }).name === 'AbortError') return
+      setFileError("Impossibile aprire il file. Riprova.")
+    }
   }
 
   async function handleSaveFile() {
     if (!currentNote) return
-    const content = useEditorStore.getState().currentText
-    await saveNoteToFile({ ...currentNote, content })
+    setFileError(null)
+    try {
+      const content = useEditorStore.getState().currentText
+      await saveNoteToFile({ ...currentNote, content })
+    } catch (err) {
+      if (err != null && (err as { name?: string }).name === 'AbortError') return
+      setFileError("Impossibile salvare il file. Riprova.")
+    }
   }
 
   function handleSelect(id: string) {
@@ -48,13 +60,19 @@ export function Sidebar() {
   }
 
   async function commitRename(note: Parameters<typeof renameNote>[0]) {
-    const renamed = await renameNote(note, editingTitle)
-    if (currentId === note.id) {
-      updateCurrent({ title: renamed.title })
-    } else {
-      loadNote({ ...note, title: renamed.title, updatedAt: renamed.updatedAt })
+    try{
+      const renamed = await renameNote(note, editingTitle)
+      if (currentId === note.id) {
+        updateCurrent({ title: renamed.title })
+      } else {
+        loadNote({ ...note, title: renamed.title, updatedAt: renamed.updatedAt })
+      }
+      setEditingId(null)
+    } catch (err) {
+      if (err != null && (err as { name?: string }).name === 'AbortError') return
+      setFileError("Impossibile rinominare la nota. Riprova.")
+      setEditingId(null)
     }
-    setEditingId(null)
   }
 
  if (collapsed) {
@@ -126,6 +144,12 @@ export function Sidebar() {
           <span className="truncate">Salva file</span>
         </button>
       </div>
+
+      {fileError && (
+        <p role="alert" className="px-4 py-2 text-xs text-destructive">
+          {fileError}
+        </p>
+      )}
 
       <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Note">
         <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
