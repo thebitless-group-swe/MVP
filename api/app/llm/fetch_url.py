@@ -1,18 +1,17 @@
-import os
-
 from tavily import TavilyClient
-from urllib.parse import urlparse
+
+from ..settings import get_settings
 
 MAX_CHARS = 12_000
 MAX_URL_LENGTH = 2_048
+
 
 class FetchError(Exception):
     """Errore durante l'estrazione del contenuto della pagina."""
 
 
 def _get_client() -> TavilyClient:
-    api_key = os.environ.get("TAVILY_API_KEY")
-    return TavilyClient(api_key=api_key)
+    return TavilyClient(api_key=get_settings().tavily_api_key)
 
 
 async def fetch_and_extract(url: str) -> str:
@@ -37,10 +36,8 @@ async def fetch_and_extract(url: str) -> str:
 
     return content[:MAX_CHARS]
 
+
 def validate_link(url: str) -> None:
+    """Verifica il limite di lunghezza dell'url."""
     if len(url) > MAX_URL_LENGTH:
         raise FetchError("Url troppo lungo")
-
-    parsed = urlparse(url).scheme
-    if parsed not in ("http", "https"):
-        raise FetchError("Url non valido")

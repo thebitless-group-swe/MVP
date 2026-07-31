@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 # Alias riusabile per la lunghezza richiesta delle funzioni AI.
 Length = Literal["breve", "medio", "dettagliato"]
@@ -29,8 +29,8 @@ class GenerateRequest(BaseModel):
 
 
 class LinkRequest(BaseModel):
-    # url e' solo str per ora: la validazione vera arriva in B-05.
-    url: str
+    #HttpUrl valida schema e forma dell'url: input malformato -> 422
+    url: HttpUrl
     length: Length = "medio"
 
 

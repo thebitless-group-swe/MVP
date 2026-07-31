@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.llm.fetch_url import FetchError, fetch_and_extract, validate_link, MAX_URL_LENGTH
+from app.llm.fetch_url import MAX_URL_LENGTH, FetchError, fetch_and_extract, validate_link
 
 SAMPLE_CONTENT = "Questo è un contenuto di esempio estratto dalla pagina."
 
@@ -58,26 +58,16 @@ async def test_fetch_and_extract_truncates_long_content(mock_tavily_client: Magi
     assert len(result) <= 12_000
 
 
-# Schema valido: nessuna eccezione
+# Schema e forma dell'URL sono ora validati da HttpUrl in LinkRequest: la
+# copertura di quei casi vive in test_config_hygiene.py. Qui resta il solo
+# vincolo che lo schema non esprime, cioe' la lunghezza massima.
 @pytest.mark.parametrize("url", [
     "http://example.com",
     "https://example.com",
     "https://example.com/path?query=1",
 ])
-def test_validate_link_accepts_valid_schemes(url: str) -> None:
+def test_validate_link_accepts_urls_within_the_length_limit(url: str) -> None:
     validate_link(url)  # non deve lanciare
-
-
-# Schema non valido: deve lanciare FetchError
-@pytest.mark.parametrize("url", [
-    "ftp://example.com",
-    "file:///etc/passwd",
-    "javascript:alert(1)",
-    "example.com",          
-])
-def test_validate_link_rejects_invalid_schemes(url: str) -> None:
-    with pytest.raises(FetchError):
-        validate_link(url)
 
 
 # URL troppo lungo: deve lanciare FetchError
