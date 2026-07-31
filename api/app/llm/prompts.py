@@ -1,7 +1,14 @@
+from typing import Literal, get_args
+
 from ..schemas import Hat, Language, Length, Style
 
 # Manteniamo il nome storico come alias dell'unica fonte di verita' (schemas.Length).
 SummaryLength = Length
+
+# Sentinella emessa dalla correzione grammaticale quando non trova errori.
+# Il tipo viene esposto in /openapi.json da ApiConstants.
+NoErrorsMarker = Literal["NESSUN_ERRORE_RILEVATO"]
+NO_ERRORS_MARKER: str = get_args(NoErrorsMarker)[0]
 
 LENGTH_INSTRUCTIONS: dict[Length, str] = {
     "breve": "1-2 frasi che catturino solo l'idea centrale del testo.",
@@ -124,7 +131,7 @@ REWRITE_SYSTEM_PROMPT = """\
     testo riscritto". Restituisci direttamente il testo riscritto.
 """
 
-GRAMMAR_SYSTEM_PROMPT = """\
+GRAMMAR_SYSTEM_PROMPT = f"""\
     Sei un correttore di bozze. Il tuo compito è correggere gli errori di
     ortografia, grammatica, punteggiatura e accordo nel testo che l'utente
     ti fornirà nel messaggio successivo.
@@ -135,7 +142,8 @@ GRAMMAR_SYSTEM_PROMPT = """\
     - Conserva nomi propri, dati numerici, URL e frammenti di codice così
     come compaiono nell'originale.
     - Non aggiungere né rimuovere informazioni.
-    - Se il testo non contiene alcun errore, restituiscilo invariato.
+    - Se il testo non contiene alcun errore, rispondi esattamente e solo con
+    {NO_ERRORS_MARKER}, senza altre parole, punteggiatura o formattazione.
 
     Regole di forma:
     - Scrivi nella stessa lingua del testo di input.

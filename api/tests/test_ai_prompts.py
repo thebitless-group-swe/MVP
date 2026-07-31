@@ -1,10 +1,12 @@
-"""Test B-03: prompt delle quattro funzioni AI e dei sei cappelli."""
+"""Test B-03/B-05: prompt delle quattro funzioni AI e dei sei cappelli."""
 from typing import get_args
 
 import pytest
 
 from app.llm.prompts import (
     CRITIQUE_SYSTEM_PROMPTS,
+    GRAMMAR_SYSTEM_PROMPT,
+    NO_ERRORS_MARKER,
     STYLE_INSTRUCTIONS,
     build_critique_messages,
     build_grammar_messages,
@@ -64,6 +66,11 @@ class TestGrammarMessages:
         msgs = build_grammar_messages(TEST_TEXT)
 
         _assert_system_then_user(msgs, TEST_TEXT)
+
+    def test_prompt_declares_the_no_errors_sentinel(self) -> None:
+        assert NO_ERRORS_MARKER == "NESSUN_ERRORE_RILEVATO"
+        assert NO_ERRORS_MARKER in GRAMMAR_SYSTEM_PROMPT
+        assert NO_ERRORS_MARKER in build_grammar_messages(TEST_TEXT)[0]["content"]
 
 
 class TestCritiqueMessages:

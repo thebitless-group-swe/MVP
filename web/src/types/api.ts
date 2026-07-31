@@ -55,6 +55,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate */
+        post: operations["translate_api_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rewrite */
+        post: operations["rewrite_api_rewrite_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grammar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grammar */
+        post: operations["grammar_api_grammar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/critique": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Critique */
+        post: operations["critique_api_critique_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/constants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Constants */
+        get: operations["constants_api_constants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -76,6 +161,33 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ApiConstants
+         * @description Costanti del contratto che il frontend non deve riscrivere a mano.
+         *
+         *     Il campo e' tipizzato come letterale: finisce in `/openapi.json` come
+         *     `const`, quindi `pnpm types:gen` lo trasforma in un tipo letterale e una
+         *     modifica lato backend rompe la compilazione del frontend invece di
+         *     scollegare silenziosamente le due copie (B-05).
+         */
+        ApiConstants: {
+            /**
+             * No Errors Marker
+             * @default NESSUN_ERRORE_RILEVATO
+             * @constant
+             */
+            no_errors_marker: "NESSUN_ERRORE_RILEVATO";
+        };
+        /** CritiqueRequest */
+        CritiqueRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Hat
+             * @enum {string}
+             */
+            hat: "bianco" | "rosso" | "giallo" | "nero" | "verde" | "blu";
+        };
         /** GenerateRequest */
         GenerateRequest: {
             /** Prompt */
@@ -87,6 +199,11 @@ export interface components {
              */
             length: "breve" | "medio" | "dettagliato";
         };
+        /** GrammarRequest */
+        GrammarRequest: {
+            /** Text */
+            text: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -94,7 +211,10 @@ export interface components {
         };
         /** LinkRequest */
         LinkRequest: {
-            /** Url */
+            /**
+             * Url
+             * Format: uri
+             */
             url: string;
             /**
              * Length
@@ -102,6 +222,16 @@ export interface components {
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+        };
+        /** RewriteRequest */
+        RewriteRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "formale" | "informale" | "accademico";
         };
         /** TextRequest */
         TextRequest: {
@@ -113,6 +243,16 @@ export interface components {
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+        };
+        /** TranslateRequest */
+        TranslateRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Target Language
+             * @enum {string}
+             */
+            target_language: "inglese" | "francese" | "tedesco" | "spagnolo";
         };
         /** ValidationError */
         ValidationError: {
@@ -231,6 +371,158 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_api_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rewrite_api_rewrite_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RewriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grammar_api_grammar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrammarRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    critique_api_critique_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CritiqueRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    constants_api_constants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiConstants"];
                 };
             };
         };

@@ -1,4 +1,4 @@
-"""Test B-04: le quattro nuove route AI."""
+"""Test B-04/B-05: le quattro nuove route AI."""
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.llm import get_llm_client
 from app.llm.client import LLMClient
 from app.llm.errors import LLMProviderError
+from app.llm.prompts import NO_ERRORS_MARKER
 from app.llm.streaming import SERVICE_UNAVAILABLE_DETAIL
 from app.main import app
 from tests.conftest import DummyLLMClient
@@ -112,3 +113,38 @@ class TestProviderUnavailable:
 
         assert response.status_code == 503
         assert response.json()["detail"] == SERVICE_UNAVAILABLE_DETAIL
+
+
+class TestNoErrorsSentinel:
+    """B-05: la sentinella attraversa lo stream intatta."""
+
+    @pytest.fixture(autouse=True)
+    def _override_with_sentinel_client(self) -> Iterator[None]:
+        app.dependency_overrides[get_llm_client] = lambda: DummyLLMClient(
+            [NO_ERRORS_MARKER]
+        )
+        yield
+        app.dependency_overrides.clear()
+
+    def test_sentinel_reaches_the_client_intact(self, client: TestClient) -> None:
+        response = client.post("/api/grammar", json={"text": VALID_TEXT})
+
+        assert response.status_code == 200
+        assert f"data: {NO_ERRORS_MARKER}\n\n" in response.text
+
+    def test_sentinel_is_published_in_the_api_contract(
+        self, client: TestClient
+    ) -> None:
+        assert client.get("/api/constants").json() == {
+            "no_errors_marker": NO_ERRORS_MARKER
+        }
+
+    def test_sentinel_is_a_const_in_the_openapi_schema(
+        self, client: TestClient
+    ) -> None:
+        schema = client.get("/openapi.json").json()
+        field = schema["components"]["schemas"]["ApiConstants"]["properties"][
+            "no_errors_marker"
+        ]
+
+        assert field["const"] == NO_ERRORS_MARKER

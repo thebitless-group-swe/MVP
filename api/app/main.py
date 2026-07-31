@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .routes import (
+    constants_router,
     critique_router,
     generate_link_router,
     generate_router,
@@ -32,6 +33,7 @@ app.include_router(translate_router)
 app.include_router(rewrite_router)
 app.include_router(grammar_router)
 app.include_router(critique_router)
+app.include_router(constants_router)
 
 
 @app.exception_handler(HTTPException)
