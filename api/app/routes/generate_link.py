@@ -1,15 +1,14 @@
 import logging
-from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from ..schemas import LinkRequest
 from ..llm import get_llm_client
 from ..llm.client import LLMClient
-from ..llm.errors import LLMProviderError
+from ..llm.fetch_url import FetchError, fetch_and_extract, validate_link
 from ..llm.prompts import build_generate_messages
-from ..llm.fetch_url import validate_link, fetch_and_extract, FetchError
+from ..llm.streaming import sse_response
+from ..schemas import LinkRequest
 
 router = APIRouter(prefix="/api", tags=["generate-link"])
 
@@ -36,40 +35,10 @@ async def generate_from_link(
         raise HTTPException(status_code=503, detail=_SERVICE_UNAVAILABLE_DETAIL) from exc
 
     generation_prompt = (
-        f"Scrivi un testo originale in italiano evitando frasi introduttive di qualsiasi tipo basato sul seguente contenuto estratto da link: {text}"
+        "Scrivi un testo originale in italiano evitando frasi introduttive di "
+        f"qualsiasi tipo basato sul seguente contenuto estratto da link: {text}"
     )
     messages = build_generate_messages(generation_prompt, payload.length)
-    stream = client.stream(messages)
-
-    try:
-        first_chunk = await anext(stream)
-        stream_exhausted = False
-    except StopAsyncIteration:
-        first_chunk = None
-        stream_exhausted = True
-    except LLMProviderError:
-        logger.exception("Errore provider LLM durante apertura stream generate-from-link")
-        await stream.aclose()
-        raise HTTPException(status_code=503, detail=_SERVICE_UNAVAILABLE_DETAIL)
-
-    async def event_stream() -> AsyncIterator[str]:
-        try:
-            if not stream_exhausted:
-                if await request.is_disconnected():
-                    logger.info("Client disconnesso, chiudo stream generate-from-link")
-                    return
-                yield f"data: {first_chunk}\n\n"
-
-                async for chunk in stream:
-                    if await request.is_disconnected():
-                        logger.info("Client disconnesso, chiudo stream generate-from-link")
-                        return
-                    yield f"data: {chunk}\n\n"
-            yield "data: [DONE]\n\n"
-        except LLMProviderError:
-            logger.exception("Errore provider LLM durante stream generate-from-link")
-            return
-        finally:
-            await stream.aclose()
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return await sse_response(
+        request, client.stream(messages), "generate-from-link", logger
+    )
