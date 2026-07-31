@@ -27,7 +27,6 @@ export function Sidebar() {
     const note = await openNoteFromFile()
     if (!note) return
     loadNote(note)
-    useEditorStore.getState().setCurrentText(note.content)
   }
 
   async function handleSaveFile() {
@@ -38,8 +37,6 @@ export function Sidebar() {
 
   function handleSelect(id: string) {
     select(id)
-    const note = useNotesStore.getState().list.find((n) => n.id === id)
-    if (note) useEditorStore.getState().setCurrentText(note.content)
   }
 
   function startRename(note: { id: string; title: string }) {

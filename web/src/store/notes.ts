@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Note } from '../lib/fileSystem'
+import { useEditorStore } from './useEditorStore'
 
 type NotesState = {
   list: Note[]
@@ -28,11 +29,14 @@ export const useNotesStore = create<NotesState>()(
     updatedAt: now,
   }
   set((s) => ({ list: [...s.list, note], currentId: note.id }))
+  useEditorStore.getState().setCurrentText('')
   return note
 },
 
       select(id: string) {
         set({ currentId: id })
+        const note = get().list.find((n) => n.id === id)
+        if (note) useEditorStore.getState().setCurrentText(note.content)
       },
 
       updateCurrent(patch) {
@@ -72,6 +76,7 @@ loadNote: (noteData) => {
       : [...s.list, note]
     return { list: newList, currentId: note.id }
   })
+  useEditorStore.getState().setCurrentText(note.content)
 },
     }),
     { name: 'notes_persistence' }
