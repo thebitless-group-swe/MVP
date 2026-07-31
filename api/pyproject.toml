@@ -1,7 +1,7 @@
 [project]
 name = "api"
 version = "0.1.0"
-description = "Add your description here"
+description = "Backend FastAPI del MVP Second Brain"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -19,8 +19,18 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=5.0",
     "respx>=0.22",
+    "ruff>=0.14",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+# Soglia MPC-CC del Piano di Qualifica (valore accettabile).
+fail_under = 70
+show_missing = true

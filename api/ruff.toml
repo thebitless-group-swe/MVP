@@ -1,0 +1,23 @@
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings (include gli spazi finali)
+    "F",   # pyflakes
+    "I",   # isort: ordinamento degli import
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+
+[lint.isort]
+known-first-party = ["app", "tests"]
+
+[lint.flake8-bugbear]
+# Depends() nei default degli argomenti e' il modo con cui FastAPI dichiara
+# le dipendenze, non un mutable default.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path"]
+
+[format]
+quote-style = "double"

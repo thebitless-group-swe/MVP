@@ -1,9 +1,10 @@
-from tests.conftest import DummyLLMClient
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 
-from app.main import app
+from fastapi.testclient import TestClient
+
 from app.llm import get_llm_client
+from app.main import app
+from tests.conftest import DummyLLMClient
 
 
 def test_health(client: TestClient) -> None:
@@ -14,10 +15,21 @@ def test_health(client: TestClient) -> None:
     assert "model" in body
 
 
-def test_generate_returns_sse(client: TestClient) -> None:
-    response = client.post("/api/generate", json={"prompt": "Scrivi un testo sul mare"})
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/event-stream")
+def test_generate_returns_sse(
+    client: TestClient, dummy_llm_client: DummyLLMClient
+) -> None:
+    # Senza override il test chiamerebbe il gateway LiteLLM reale: in CI, e su
+    # una macchina senza chiave, fallisce con 503.
+    app.dependency_overrides[get_llm_client] = lambda: dummy_llm_client
+
+    try:
+        response = client.post(
+            "/api/generate", json={"prompt": "Scrivi un testo sul mare"}
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_generate_from_link_invalid_url_returns_4xx(client: TestClient) -> None:
