@@ -16,6 +16,7 @@ beforeEach(() => {
     isGenerating: false,
     errorMessage: null,
     aiModal: null,
+    _abortController: null,
   })
 })
 
@@ -302,5 +303,31 @@ describe('useEditorStore — discardOutput', () => {
     })
     expect(result.current.currentText).toBe('nota intatta')
     expect(useEditorStore.getState().selectedText).toBe('parola')
+  })
+})
+
+describe('useEditorStore — abortStream', () => {
+  it('abortStream chiama abort sul controller e lo azzera', () => {
+    const controller = new AbortController()
+    const abortSpy = vi.spyOn(controller, 'abort')
+
+    act(() => {
+      useEditorStore.setState({ _abortController: controller })
+    })
+
+    act(() => {
+      useEditorStore.getState().abortStream()
+    })
+
+    expect(abortSpy).toHaveBeenCalledTimes(1)
+    expect(useEditorStore.getState()._abortController).toBeNull()
+  })
+
+  it('abortStream con controller null non lancia errori', () => {
+    expect(() => {
+      act(() => {
+        useEditorStore.getState().abortStream()
+      })
+    }).not.toThrow()
   })
 })

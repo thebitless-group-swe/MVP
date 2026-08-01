@@ -16,3 +16,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+
+# Report di copertura
+.coverage
+coverage.xml
+htmlcov/
+coverage/

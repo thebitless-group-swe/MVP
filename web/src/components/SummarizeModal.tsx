@@ -1,14 +1,8 @@
 import { useState } from 'react'
-import 'katex/dist/katex.min.css'
-import 'highlight.js/styles/github-dark.css'
 
 import { Dialog } from 'radix-ui'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import rehypeKatex from 'rehype-katex'
-import rehypeHighlight from 'rehype-highlight'
 
+import { MarkdownView } from '@/components/MarkdownView'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAiStream } from '@/hooks/useAiStream'
@@ -132,14 +126,7 @@ export function SummarizeModal() {
               isGenerating && 'typing-active',
             )}
           >
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex, rehypeHighlight]}
-              >
-                {displayed}
-              </ReactMarkdown>
-            </div>
+            <MarkdownView className="prose-sm">{displayed}</MarkdownView>
           </div>
 
           <div aria-live="polite">
