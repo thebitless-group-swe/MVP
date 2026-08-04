@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Note } from '../lib/fileSystem'
+import { useEditorStore } from './useEditorStore'
 
 type NotesState = {
   list: Note[]
@@ -19,20 +20,41 @@ export const useNotesStore = create<NotesState>()(
       currentId: null,
 
       createEmpty: () => {
-  const now = Date.now()
-  const note: Note = {
-    id: crypto.randomUUID(),
-    title: 'Senza titolo',
-    content: '',
-    createdAt: now,
-    updatedAt: now,
+        const {currentId} = get()
+        if (currentId) {
+          const content = useEditorStore.getState().currentText
+          set((s) => ({
+            list: s.list.map((n) =>
+              n.id === currentId ? { ...n, content, updatedAt: Date.now() } : n
+            ),
+          }))
+        }
+        const now = Date.now()
+        const note: Note = {
+        id: crypto.randomUUID(),
+        title: 'Senza titolo',
+        content: '',
+        createdAt: now,
+        updatedAt: now,
   }
   set((s) => ({ list: [...s.list, note], currentId: note.id }))
+  useEditorStore.getState().setCurrentText('')
   return note
 },
 
       select(id: string) {
+        const { currentId } = get()
+        if (currentId) {
+          const content = useEditorStore.getState().currentText
+          set((s) => ({
+            list: s.list.map((n) =>
+              n.id === currentId ? { ...n, content, updatedAt: Date.now() } : n
+            ),
+          }))
+        }
         set({ currentId: id })
+        const note = get().list.find((n) => n.id === id)
+        if (note) useEditorStore.getState().setCurrentText(note.content)
       },
 
       updateCurrent(patch) {
@@ -72,9 +94,18 @@ loadNote: (noteData) => {
       : [...s.list, note]
     return { list: newList, currentId: note.id }
   })
+  useEditorStore.getState().setCurrentText(note.content)
 },
     }),
-    { name: 'notes_persistence' }
+    { name: 'notes_persistence', 
+      onRehydrateStorage: () => (state) => {
+        if(!state) return
+        const currentNote = state.list.find((n) => n.id === state.currentId)
+        if (currentNote) {
+          useEditorStore.getState().setCurrentText(currentNote.content)
+        }
+      }
+    }
   )
 )
 

@@ -66,6 +66,14 @@ export const toggleItalicCommand = (view: EditorView): boolean =>
 export const toggleInlineCodeCommand = (view: EditorView): boolean =>
   wrapInline(view, '`')
 
+/** Sottolineato: `++testo++`, reso dal plugin remarkUnderline. */
+export const toggleUnderlineCommand = (view: EditorView): boolean =>
+  wrapInline(view, '++')
+
+/** Barrato: `~~testo~~`, reso da remark-gfm. */
+export const toggleStrikethroughCommand = (view: EditorView): boolean =>
+  wrapInline(view, '~~')
+
 /**
  * Titolo: cicla il livello sulla riga corrente — nessuno → # → ## → ### →
  * di nuovo testo normale.
@@ -81,6 +89,31 @@ export const cycleHeadingCommand = (view: EditorView): boolean => {
     removeLen = match[0].length
     insert = match[1].length >= 3 ? '' : '#'.repeat(match[1].length + 1) + ' '
   }
+
+  view.dispatch({
+    changes: { from: line.from, to: line.from + removeLen, insert },
+  })
+  view.focus()
+  return true
+}
+
+/** Livelli offerti dal menu Titolo: 0 è testo normale. */
+export type HeadingLevel = 0 | 1 | 2 | 3
+
+/**
+ * Titolo: imposta un livello esplicito sulla riga corrente, sostituendo
+ * quello eventualmente già presente (R-17 → R-20).
+ */
+export const setHeadingCommand = (
+  view: EditorView,
+  level: HeadingLevel,
+): boolean => {
+  const { from } = view.state.selection.main
+  const line = view.state.doc.lineAt(from)
+  const match = line.text.match(/^(#{1,6}) /)
+
+  const removeLen = match ? match[0].length : 0
+  const insert = level === 0 ? '' : `${'#'.repeat(level)} `
 
   view.dispatch({
     changes: { from: line.from, to: line.from + removeLen, insert },

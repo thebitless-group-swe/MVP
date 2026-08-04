@@ -1,5 +1,6 @@
 from app.settings import Settings, get_settings
 
+
 def test_get_settings_returns_settings_instance() -> None:
     settings = get_settings()
     assert isinstance(settings, Settings)

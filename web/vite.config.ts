@@ -18,5 +18,22 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      exclude: [
+        'src/main.tsx',
+        'src/test/**',
+        'src/types/**',
+        '**/*.config.{ts,js}',
+      ],
+      // Soglia MPC-CC del Piano di Qualifica (valore accettabile).
+      thresholds: {
+        statements: 70,
+        branches: 70,
+        functions: 70,
+        lines: 70,
+      },
+    },
   },
 })

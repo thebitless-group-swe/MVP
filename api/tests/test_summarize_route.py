@@ -12,6 +12,7 @@ from app.llm.client import LLMClient
 from app.main import app
 from tests.conftest import DummyLLMClient
 
+
 #Sostituisce il LiteLLMClient con il dummy prima di OGNI test (autouse=True)
 #Una volta finito lo rimuove
 @pytest.fixture(autouse=True)
@@ -152,7 +153,7 @@ async def test_disconnects_does_not_leave_pending_tasks() -> None:
 
     pending = [
         w for w in caught
-        if "task" in str(w.message).lower() and "pending" in str("w.message").lower()
+        if "task" in str(w.message).lower() and "pending" in str(w.message).lower()
     ]
 
     assert not pending, f"Trovati warning task pending: {pending}"
