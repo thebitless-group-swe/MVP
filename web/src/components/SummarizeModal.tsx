@@ -68,7 +68,7 @@ export function SummarizeModal() {
     useEditorStore.getState().discardOutput()
   }
 
-  const handleInsert = () => 
+  const handleInsert = () => {
     setLastParams(null)
     useEditorStore.getState().insertOutputIntoNote(AI_ACTIONS['summarize'].insertMode)
   }
