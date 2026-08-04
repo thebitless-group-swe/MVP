@@ -17,6 +17,7 @@ import {
   useStreamedOutput,
 } from '@/store/useEditorStore'
 import { useAiStream } from '@/hooks/useAiStream'
+import { AI_ACTIONS } from '@/lib/aiActions'
 
 // Stessa union del contratto: la deriviamo invece di riscriverla.
 type Length = GenerateRequest['length']
@@ -95,7 +96,8 @@ export function GenerateModal() {
 
   const handleInsert = () => {
     setLastParams(null)
-    useEditorStore.getState().insertOutputIntoNote()
+    const actionId = mode === 'link' ? 'generate-link' : 'generate'
+    useEditorStore.getState().insertOutputIntoNote(AI_ACTIONS[actionId].insertMode)
   }
 
   return (
