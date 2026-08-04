@@ -134,7 +134,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
       result.current.setCurrentText('testo originale')
     })
     act(() => {
-      result.current.insertOutputIntoNote()
+      result.current.insertOutputIntoNote('replace')
     })
     expect(result.current.currentText).toBe('testo originale')
   })
@@ -148,7 +148,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('contenuto generato')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe(
         'testo originale\n\ncontenuto generato',
@@ -164,7 +164,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('solo output')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe('solo output')
     })
@@ -177,7 +177,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('riga due')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe('riga uno\nriga due')
     })
@@ -191,7 +191,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('contenuto nuovo')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe(
         'prima parola dopo\n\ncontenuto nuovo',
@@ -206,7 +206,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('\n\n  output  \n')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe('base\n\noutput')
     })
@@ -222,7 +222,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('nuovo')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.currentText).toBe('prima nuovo dopo')
       expect(result.current.streamedOutput).toBe('')
@@ -238,7 +238,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('riassunto')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.currentText).toBe('riassunto')
       expect(result.current.streamedOutput).toBe('')
@@ -254,7 +254,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('riassunto')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.currentText).toBe('riassunto')
     })
@@ -266,7 +266,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('out')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.aiModal).toBeNull()
     })

@@ -17,6 +17,7 @@ import {
   useIsGenerating,
   useStreamedOutput,
 } from '@/store/useEditorStore'
+import {AI_ACTIONS} from '@/lib/aiActions'
 
 type Length = 'breve' | 'medio' | 'dettagliato'
 
@@ -67,9 +68,9 @@ export function SummarizeModal() {
     useEditorStore.getState().discardOutput()
   }
 
-  const handleInsert = () => {
+  const handleInsert = () => 
     setLastParams(null)
-    useEditorStore.getState().insertOutputIntoNote()
+    useEditorStore.getState().insertOutputIntoNote(AI_ACTIONS['summarize'].insertMode)
   }
 
   return (

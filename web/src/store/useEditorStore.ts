@@ -4,7 +4,16 @@ import { EditorView } from '@codemirror/view'
 // V4: layout dell'area di lavoro — solo editor, solo render, o affiancati.
 export type ViewMode = 'editor' | 'render' | 'split'
 // V4: quale modale AI è aperta (null = nessuna).
-export type AiModal = null | 'summarize' | 'generate'
+export type AiActionId = 
+| 'summarize'
+| 'translate'
+| 'rewrite'
+| 'grammar'
+| 'critique'
+| 'generate'
+| 'generate-link'
+
+export type AiModal = null | AiActionId
 
 interface EditorState {
   currentText: string
@@ -24,7 +33,7 @@ interface EditorState {
   setViewMode: (mode: ViewMode) => void
   aiModal: AiModal
   setAiModal: (modal: AiModal) => void
-  insertOutputIntoNote: () => void
+  insertOutputIntoNote: (insertMode?: 'replace' | 'append') => void
   discardOutput: () => void
   editorView: EditorView | null
   setEditorView: (view: EditorView | null) => void
@@ -54,8 +63,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   aiModal: null,
   setAiModal: (modal) => set({ aiModal: modal }),
-  insertOutputIntoNote: () => {
-    const { currentText, streamedOutput, selectedText, aiModal } = get()
+  insertOutputIntoNote: (insertMode?: 'replace' | 'append') => {
+    const { currentText, streamedOutput, selectedText} = get()
     const output = streamedOutput.trim()
     if (!output) return
 
@@ -66,7 +75,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     //  - "riassumi" (e le altre trasformazioni del testo della nota)
     //    SOSTITUISCE il sorgente, coerente con getActiveText(): ciò che è
     //    stato dato in pasto al modello viene rimpiazzato dall'output.
-    if (aiModal === 'generate') {
+    if (insertMode === 'append') {
       const sep =
         currentText.length > 0 && !currentText.endsWith('\n') ? '\n\n' : ''
       set({
