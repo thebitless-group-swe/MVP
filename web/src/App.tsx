@@ -1,12 +1,11 @@
 import { Editor } from '@/components/Editor'
 import { EditorToolbar } from '@/components/EditorToolbar'
-import { GenerateModal } from '@/components/GenerateModal'
 import { Preview } from '@/components/Preview'
 import { Sidebar } from '@/components/Sidebar'
-import { SummarizeModal } from '@/components/SummarizeModal'
 import { TopBar } from '@/components/TopBar'
 import { ViewToggle } from '@/components/ViewToggle'
 import { useViewMode } from '@/store/useEditorStore'
+import { AiActionDialog } from '@/components/AiActionDialog'
 
 export default function App() {
   const viewMode = useViewMode()
@@ -70,8 +69,7 @@ export default function App() {
         </main>
       </div>
 
-      <SummarizeModal />
-      <GenerateModal />
+      <AiActionDialog />
     </div>
   )
 }
