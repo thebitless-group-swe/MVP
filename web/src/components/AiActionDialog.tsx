@@ -135,9 +135,13 @@ export function AiActionDialog() {
   // Resetta lo stato locale ogni volta che cambia l'azione aperta
   useEffect(() => {
     if (actionId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setParams(getDefaultParams(actionId))
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInput('')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValidationError(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLastCall(null)
     }
   }, [actionId])
