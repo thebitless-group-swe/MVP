@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import {
   Languages,
   Sparkles,
@@ -18,10 +17,6 @@ import {
   type AiActionId,  
 } from '@/store/useEditorStore'
 
-type AiAction = {
-  label: string
-  icon: ReactNode
-}
 
 
 
@@ -95,20 +90,6 @@ export function TopBar({ noteTitle }: TopBarProps) {
           Analisi
         </Button>
 
-          {disabledActions.map(({ label, icon }) => (
-            <Button
-              key={label}
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled
-              aria-disabled="true"
-              title={`${label} (non disponibile)`}
-            >
-              {icon}
-              {label}
-            </Button>
-          ))}
 
           {showStreamingUi && (
             <Button
