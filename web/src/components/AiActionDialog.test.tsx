@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiActionDialog } from '@/components/AiActionDialog'
 import { useEditorStore } from '@/store/useEditorStore'
+import { NO_ERRORS_MARKER } from '@/types/models'
+import { AI_ACTIONS } from '@/lib/aiActions'
 
 // Hoisted: i mock devono essere pronti prima che vi.mock li usi
 const { mockStart, mockAbort } = vi.hoisted(() => ({
@@ -197,5 +199,105 @@ describe('AiActionDialog — testo insufficiente (R-81)', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument()
     })
+  })
+})
+
+describe('AiActionDialog — dropdown lingua', () => {
+  it('mostra le opzioni del tipo Language', () => {
+    act(() => { useEditorStore.getState().setAiModal('translate') })
+    render(<AiActionDialog />)
+
+    expect(screen.getByRole('radio', { name: 'Italiano' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Inglese' })).toBeInTheDocument()
+  })
+
+  it('selezione lingua → target_language nel body', async () => {
+    act(() => { useEditorStore.getState().setAiModal('translate') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Inglese' }))
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).toHaveBeenCalledWith({
+      endpoint: expect.stringContaining('/api/translate'),
+      body: expect.objectContaining({ target_language: expect.any(String) }),
+    })
+  })
+})
+
+describe('AiActionDialog — sentinella grammar (R-62)', () => {
+  it('sentinella → messaggio informativo e Accetta disabilitato', () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'grammar',
+        streamedOutput: NO_ERRORS_MARKER,
+        isGenerating: false,
+      })
+    })
+    render(<AiActionDialog />)
+
+    expect(screen.getByText('Nessun errore rilevato.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Accetta' })).toBeDisabled()
+  })
+
+  it('sentinella assente → Accetta abilitato se output presente', () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'grammar',
+        streamedOutput: 'Testo con errori corretto.',
+        isGenerating: false,
+      })
+    })
+    render(<AiActionDialog />)
+
+    expect(screen.getByRole('button', { name: 'Accetta' })).not.toBeDisabled()
+  })
+})
+
+describe('AiActionDialog — critique (cappelli)', () => {
+  it('i 6 cappelli sono renderizzati', () => {
+    act(() => { useEditorStore.getState().setAiModal('critique') })
+    render(<AiActionDialog />)
+
+    expect(screen.getAllByRole('radio')).toHaveLength(6)
+    expect(screen.getByRole('radio', { name: /informativo/i })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /emotivo/i })).toBeInTheDocument()
+  })
+
+  it('nessun cappello preselezionato', () => {
+    act(() => { useEditorStore.getState().setAiModal('critique') })
+    render(<AiActionDialog />)
+
+    const radios = screen.getAllByRole('radio')
+    radios.forEach((r) => expect(r).toHaveAttribute('aria-checked', 'false'))
+  })
+
+  it('click cappello → hat corretto nel body', async () => {
+    act(() => { useEditorStore.getState().setAiModal('critique') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: /critico/i }))
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).toHaveBeenCalledWith({
+      endpoint: expect.stringContaining('/api/critique'),
+      body: expect.objectContaining({ hat: expect.any(String) }),
+    })
+  })
+
+  it('senza cappello → nessuna fetch, mostra alert', async () => {
+    act(() => { useEditorStore.getState().setAiModal('critique') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    })
+  })
+
+  it('insertMode è append', () => {
+    expect(AI_ACTIONS['critique'].insertMode).toBe('append')
   })
 })
