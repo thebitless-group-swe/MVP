@@ -18,8 +18,6 @@ def test_health(client: TestClient) -> None:
 def test_generate_returns_sse(
     client: TestClient, dummy_llm_client: DummyLLMClient
 ) -> None:
-    # Senza override il test chiamerebbe il gateway LiteLLM reale: in CI, e su
-    # una macchina senza chiave, fallisce con 503.
     app.dependency_overrides[get_llm_client] = lambda: dummy_llm_client
 
     try:
@@ -39,13 +37,16 @@ def test_generate_from_link_invalid_url_returns_4xx(client: TestClient) -> None:
     assert 400 <= response.status_code < 500
 
 
-@patch("app.routes.generate_link.fetch_and_extract", new_callable=AsyncMock)
+@patch("app.routes.generate_link.TavilyExtractor")
 def test_generate_from_link_valid_url_returns_sse(
-    mock_fetch: AsyncMock,
+    mock_tavily: AsyncMock,
     client: TestClient,
     dummy_llm_client: DummyLLMClient,
 ) -> None:
-    mock_fetch.return_value = "Contenuto estratto di esempio."
+    mock_extractor = AsyncMock()
+    mock_extractor.extract = AsyncMock(return_value="Contenuto estratto di esempio.")
+    mock_tavily.return_value = mock_extractor
+
     app.dependency_overrides[get_llm_client] = lambda: dummy_llm_client
 
     try:
