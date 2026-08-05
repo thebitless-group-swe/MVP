@@ -85,7 +85,7 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
       text,
       hat: params.hat as Hat,
     }),
-    insertMode: 'replace',
+    insertMode: 'append',
     minLength: 10,
   },
   generate: {

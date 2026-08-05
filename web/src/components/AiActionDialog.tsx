@@ -17,6 +17,7 @@ import {
   useStreamedOutput,
   type AiActionId,
 } from '@/store/useEditorStore'
+import { NO_ERRORS_MARKER } from '@/types/models'
 
 
 const LENGTHS: { value: Length; label: string }[] = [
@@ -40,15 +41,22 @@ const STYLES: { value: Style; label: string }[] = [
   { value: 'simple' as Style, label: 'Semplice' },
 ]
 
-const HATS: { value: Hat; label: string }[] = [
-  { value: 'white' as Hat, label: 'Informativo' },
-  { value: 'red' as Hat, label: 'Emotivo' },
-  { value: 'black' as Hat, label: 'Critico' },
-  { value: 'yellow' as Hat, label: 'Ottimista' },
-  { value: 'green' as Hat, label: 'Creativo' },
-  { value: 'blue' as Hat, label: 'Organizzativo' },
-]
+type HatDef = {
+  value: Hat
+  emoji: string
+  label: string
+  description: string
+  color: string
+}
 
+const HAT_DEFS: HatDef[] = [
+  { value: 'white' as Hat, emoji: '⚪', label: 'Informativo', description: 'Fatti, dati e informazioni oggettive', color: 'border-gray-300 bg-gray-50 text-gray-800' },
+  { value: 'red' as Hat, emoji: '🔴', label: 'Emotivo', description: 'Intuizioni, emozioni e sensazioni', color: 'border-red-300 bg-red-50 text-red-800' },
+  { value: 'black' as Hat, emoji: '⚫', label: 'Critico', description: 'Difficoltà, rischi e punti deboli', color: 'border-gray-700 bg-gray-800 text-gray-100' },
+  { value: 'yellow' as Hat, emoji: '🟡', label: 'Ottimista', description: 'Vantaggi, benefici e opportunità', color: 'border-yellow-300 bg-yellow-50 text-yellow-800' },
+  { value: 'green' as Hat, emoji: '🟢', label: 'Creativo', description: 'Nuove idee, alternative e soluzioni', color: 'border-green-300 bg-green-50 text-green-800' },
+  { value: 'blue' as Hat, emoji: '🔵', label: 'Organizzativo', description: 'Processo, struttura e prossimi passi', color: 'border-blue-300 bg-blue-50 text-blue-800' },
+]
 
 function getDefaultParams(actionId: AiActionId): Record<string, unknown> {
   switch (actionId) {
@@ -61,7 +69,7 @@ function getDefaultParams(actionId: AiActionId): Record<string, unknown> {
     case 'rewrite':
       return { style: STYLES[0].value }
     case 'critique':
-      return { hat: HATS[0].value }
+      return {}
     case 'grammar':
       return {}
   }
@@ -113,6 +121,44 @@ function PillSelector<T extends string>({
   )
 }
 
+function HatSelector({
+  value,
+  onChange,
+}: {
+  value: Hat | null
+  onChange: (v: Hat) => void
+}) {
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="text-sm font-medium text-foreground">
+        Prospettiva (cappello)
+      </legend>
+      <div role="radiogroup" aria-label="Seleziona cappello" className="grid grid-cols-2 gap-2">
+        {HAT_DEFS.map(({ value: v, emoji, label, description, color }) => {
+          const active = value === v
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(v)}
+              className={cn(
+                'flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left text-sm transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                active ? color : 'border-border bg-background text-foreground hover:bg-muted',
+              )}
+            >
+              <span className="font-medium">{emoji} {label}</span>
+              <span className="text-xs opacity-70">{description}</span>
+            </button>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
+
 
 type LastCall = { input: string; params: Record<string, unknown> }
 
@@ -131,6 +177,11 @@ export function AiActionDialog() {
   const errorMessage = useErrorMessage()
   const displayed = useTypewriter(streamedOutput, isGenerating)
   const { start, abort } = useAiStream()
+
+  const isNoErrors = 
+    actionId === 'grammar' &&
+    !isGenerating &&
+    streamedOutput === NO_ERRORS_MARKER
 
   // Resetta lo stato locale ogni volta che cambia l'azione aperta
   useEffect(() => {
@@ -168,6 +219,11 @@ export function AiActionDialog() {
       )
       return
     }
+    if (actionId === 'critique' && !params.hat) {
+      setValidationError('Seleziona un cappello per l analisi.')
+      return
+    }
+
     const body = action.buildBody(params, currentInput)
     setLastCall({ input: currentInput, params: { ...params } })
     useEditorStore.setState({ streamedOutput: '', errorMessage: null })
@@ -265,12 +321,10 @@ export function AiActionDialog() {
         )
       case 'critique':
         return (
-          <PillSelector<Hat>
-            label="Cappello"
-            options={HATS}
-            value={(params.hat as Hat) ?? HATS[0].value}
+          <HatSelector
+            value={(params.hat as Hat) ?? null}
             onChange={(v) => setParams((p) => ({ ...p, hat: v }))}
-          />
+            />
         )
       case 'grammar':
         return null
@@ -307,7 +361,11 @@ export function AiActionDialog() {
               isGenerating && 'typing-active',
             )}
           >
-            <MarkdownView className="prose-sm">{displayed}</MarkdownView>
+            {isNoErrors ? (
+               <p className="text-sm text-muted-foreground">Nessun errore rilevato.</p>
+              ) : (
+                <MarkdownView className="prose-sm">{displayed}</MarkdownView>
+              )}
           </div>
 
           {(validationError !== null || errorMessage !== null) && (
@@ -365,8 +423,8 @@ export function AiActionDialog() {
                 variant="secondary"
                 size="sm"
                 onClick={handleAccept}
-                disabled={isGenerating || displayed.length === 0}
-                aria-disabled={isGenerating || displayed.length === 0}
+                disabled={isGenerating || displayed.length === 0 || isNoErrors}
+                aria-disabled={isGenerating || displayed.length === 0 || isNoErrors}
               >
                 Accetta
               </Button>

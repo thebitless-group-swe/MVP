@@ -38,16 +38,19 @@ describe('AI_ACTIONS — buildBody', () => {
   )
 })
 
-describe('AI_ACTIONS — invariante insertMode / source', () => {
-  it.each(ALL_ACTION_IDS)(
-    '%s: insertMode coerente con source',
-    (id) => {
-      const { source, insertMode } = AI_ACTIONS[id]
-      if (source === 'text') {
-        expect(insertMode).toBe('replace')
-      } else {
-        expect(insertMode).toBe('append')
-      }
+describe('AI_ACTIONS — insertMode per azione', () => {
+  it.each([
+    ['summarize', 'replace'],
+    ['translate', 'replace'],
+    ['rewrite', 'replace'],
+    ['grammar', 'replace'],
+    ['critique', 'append'],
+    ['generate', 'append'],
+    ['generate-link', 'append'],
+  ] as [AiActionId, 'replace' | 'append'][])(
+    '%s: insertMode è %s',
+    (id, expected) => {
+      expect(AI_ACTIONS[id].insertMode).toBe(expected)
     },
   )
 })
