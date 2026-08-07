@@ -1,8 +1,13 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .llm import close_content_extractor, get_llm_client
+from .llm.client import LiteLLMClient
 from .routes import (
     constants_router,
     critique_router,
@@ -16,7 +21,42 @@ from .routes import (
 from .schemas import FIELD_LABELS, ErrorResponse
 from .settings import get_settings
 
-app = FastAPI(title="Second Brain API — PoC")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Rilascia allo shutdown le risorse dei singleton costruiti a runtime.
+
+    Entrambi gli adattatori tengono un pool di connessioni e vivono quanto il
+    processo (`@lru_cache`), ma nessuno dei due veniva chiuso: `aclose` esisteva
+    con la docstring «da invocare allo shutdown dell'app» e non era invocato da
+    nessuna parte. E' igiene, non un difetto che morde — un pool che resta
+    aperto fino alla morte di un processo che sta comunque terminando — ma senza
+    un lifespan non c'era il posto dove metterla.
+
+    Il trattamento dei due provider e' asimmetrico perche' i due problemi lo
+    sono: `get_llm_client` non ha modi di fallire e si risolve qui con un
+    `isinstance`, mentre `get_content_extractor` solleva 503 senza chiave e va
+    interrogato attraverso `close_content_extractor`, che sa come e' memoizzato.
+    """
+    #Startup deliberatamente vuoto. E' qui che andrebbe la validazione delle
+    #chiavi obbligatorie al boot: oggi una chiave mancante si scopre alla prima
+    #richiesta, cioe' dal primo utente invece che dal log di avvio.
+    yield
+
+    #Se nessuna richiesta e' passata, questa e' l'unica costruzione del client:
+    #lo si crea per chiuderlo subito. Costa una `httpx.AsyncClient` mai usata, e
+    #il provider non puo' fallire, quindi non vale una guardia sulla cache.
+    client = get_llm_client()
+    #La porta `LLMClient` non dichiara `aclose`, e non deve: il ciclo di vita e'
+    #dell'adattatore. Conoscere la classe concreta e' mestiere del composition
+    #root, che e' precisamente questo file.
+    if isinstance(client, LiteLLMClient):
+        await client.aclose()
+
+    await close_content_extractor()
+
+
+app = FastAPI(title="Second Brain API — PoC", lifespan=lifespan)
 
 #Ogni endpoint che accetta un corpo puo' rispondere 422. Dichiarare qui, in un
 #punto solo, che la forma di quella risposta e' ErrorResponse sostituisce lo

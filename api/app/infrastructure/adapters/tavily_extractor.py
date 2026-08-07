@@ -3,7 +3,6 @@ import asyncio
 from tavily import TavilyClient
 
 from ...core.ports.content_extractor import ContentExtractor, ContentExtractorError
-from ...settings import get_settings
 
 # Costante di configurazione (potrebbe spostarsi in Settings)
 MAX_CHARS = 12_000
@@ -12,11 +11,30 @@ MAX_CHARS = 12_000
 class TavilyExtractor(ContentExtractor):
     """Adattatore concreto per l'estrazione di contenuto tramite Tavily."""
 
-    def __init__(self, api_key: str | None = None):
-        self._api_key = api_key or get_settings().tavily_api_key
-        if not self._api_key:
+    def __init__(self, api_key: str):
+        #La chiave arriva da chi costruisce l'adattatore: leggerla qui da
+        #`get_settings()` legava una classe di infrastruttura alla
+        #configurazione globale, e rendeva impossibile istanziarla nei test
+        #senza toccare l'ambiente.
+        if not api_key:
             raise ContentExtractorError("TAVILY_API_KEY non configurata")
-        self._client = TavilyClient(api_key=self._api_key)
+        self._api_key = api_key
+        self._client = TavilyClient(api_key=api_key)
+
+    async def aclose(self) -> None:
+        """Chiude la sessione HTTP di Tavily (da invocare allo shutdown dell'app).
+
+        `TavilyClient` tiene una `requests.Session`, quindi un pool di connessioni
+        che sopravvive alla singola estrazione. Da quando il provider e' un
+        singleton `@lru_cache` quel pool resta aperto per l'intera vita del
+        processo, esattamente come quello di `LiteLLMClient`.
+
+        `close()` e' sincrono ma non fa I/O di rete: smonta il pool locale. Per
+        questo, a differenza di `extract`, non passa da `asyncio.to_thread`. Il
+        metodo e' comunque `async` per presentare al lifespan la stessa forma
+        dell'adattatore LLM.
+        """
+        self._client.close()
 
     async def extract(self, url: str) -> str:
         """Estrae contenuto da URL usando Tavily."""
