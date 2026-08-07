@@ -67,7 +67,10 @@ jobs:
       - name: Installa Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # La versione sta nel .nvmrc, non qui: e' lo stesso file che legge
+          # `nvm use` in locale. Duplicarla significherebbe che un giorno la CI
+          # verifica su una versione di Node che nessuno sviluppatore usa.
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 

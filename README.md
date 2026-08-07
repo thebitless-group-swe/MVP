@@ -2,6 +2,26 @@
 
 Proof of Concept per validare la pipeline LLM streaming end-to-end contro un provider LiteLLM (compatibile OpenAI).
 
+## Prerequisiti
+
+| Strumento | Versione | Vincolata da |
+|---|---|---|
+| Node | **22** (`>=22 <23`) | `.nvmrc`, `engines` in `web/package.json` |
+| pnpm | **>=11** | `packageManager` ed `engines` in `web/package.json` |
+| Python | 3.12 | `api/.python-version` |
+
+**Il package manager ufficiale del frontend è `pnpm`.** Non usare `npm install`: genera un
+albero di dipendenze diverso da quello che risolve la CI, e i bug che ne nascono si
+manifestano solo in pipeline. Per lo stesso motivo nel repository esiste un solo
+lockfile, `web/pnpm-lock.yaml`.
+
+Node **deve** essere la 22: su versioni più recenti parte della suite frontend fallisce.
+Con [nvm](https://github.com/nvm-sh/nvm) la versione giusta si prende dal `.nvmrc`:
+
+```sh
+nvm use    # legge .nvmrc dalla root
+```
+
 ## Setup
 
 ```sh
