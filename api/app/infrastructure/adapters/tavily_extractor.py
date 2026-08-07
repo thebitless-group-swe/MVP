@@ -9,13 +9,13 @@ MAX_CHARS = 12_000
 
 class TavilyExtractor(ContentExtractor):
     """Adattatore concreto per l'estrazione di contenuto tramite Tavily."""
-    
+
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key or get_settings().tavily_api_key
         if not self._api_key:
             raise ContentExtractorError("TAVILY_API_KEY non configurata")
         self._client = TavilyClient(api_key=self._api_key)
-    
+
     async def extract(self, url: str) -> str:
         """Estrae contenuto da URL usando Tavily."""
         try:
@@ -27,13 +27,15 @@ class TavilyExtractor(ContentExtractor):
             )
         except Exception as exc:
             raise ContentExtractorError(f"Errore durante l'estrazione: {exc}") from exc
-        
+
         results = response.get("results", [])
         if not results:
-            raise ContentExtractorError("Nessun contenuto estraibile: la pagina potrebbe non esistere o essere vuota")
-        
+            raise ContentExtractorError(
+                "Nessun contenuto estraibile: la pagina potrebbe non esistere o essere vuota"
+            )
+
         content = results[0].get("raw_content", "")
         if not content:
             raise ContentExtractorError("Nessun contenuto estraibile: la pagina non contiene testo")
-        
+
         return content[:MAX_CHARS]

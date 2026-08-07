@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useTypewriter } from '@/hooks/useTypewriter'
 import { useAiStream } from '@/hooks/useAiStream'
-import { AI_ACTIONS, getActiveText } from '@/lib/aiActions'
+import { AI_ACTIONS, getActiveText, type AiParams } from '@/lib/aiActions'
 import { cn } from '@/lib/utils'
 import type { Length, Language, Style, Hat } from '@/types/models'
 import {
@@ -20,26 +20,37 @@ import {
 import { NO_ERRORS_MARKER } from '@/types/models'
 
 
-const LENGTHS: { value: Length; label: string }[] = [
+// I `value` di queste costanti sono valori del CONTRATTO e non testo di
+// interfaccia: devono coincidere con i Literal di types/api.ts. Le `label`
+// restano invece testo di interfaccia, in italiano.
+//
+// `satisfies` al posto dell'annotazione `: T[]` e' deliberato: l'annotazione
+// allarga i letterali a `Language`/`Style`/`Hat` e permette a un cast di
+// nascondere un valore fuori contratto, che e' esattamente come «Traduci» e
+// «Riscrivi» sono arrivati a rispondere 422 a ogni click.
+
+const LENGTHS = [
   { value: 'breve', label: 'Breve' },
   { value: 'medio', label: 'Medio' },
   { value: 'dettagliato', label: 'Dettagliato' },
-]
+] satisfies { value: Length; label: string }[]
 
-const LANGUAGES: { value: Language; label: string }[] = [
-  { value: 'it' as Language, label: 'Italiano' },
-  { value: 'en' as Language, label: 'Inglese' },
-  { value: 'fr' as Language, label: 'Francese' },
-  { value: 'de' as Language, label: 'Tedesco' },
-  { value: 'es' as Language, label: 'Spagnolo' },
-]
+// R-58-F-Ob / UC63.1: quattro lingue di destinazione. L'italiano non e' fra
+// queste — tradurre in italiano un testo scritto in italiano non e' un caso
+// d'uso previsto.
+const LANGUAGES = [
+  { value: 'inglese', label: 'Inglese' },
+  { value: 'francese', label: 'Francese' },
+  { value: 'tedesco', label: 'Tedesco' },
+  { value: 'spagnolo', label: 'Spagnolo' },
+] satisfies { value: Language; label: string }[]
 
-const STYLES: { value: Style; label: string }[] = [
-  { value: 'formal' as Style, label: 'Formale' },
-  { value: 'casual' as Style, label: 'Casual' },
-  { value: 'technical' as Style, label: 'Tecnico' },
-  { value: 'simple' as Style, label: 'Semplice' },
-]
+// R-60-F-Ob / UC64.1: tre registri.
+const STYLES = [
+  { value: 'formale', label: 'Formale' },
+  { value: 'informale', label: 'Informale' },
+  { value: 'accademico', label: 'Accademico' },
+] satisfies { value: Style; label: string }[]
 
 type HatDef = {
   value: Hat
@@ -49,21 +60,46 @@ type HatDef = {
   color: string
 }
 
-const HAT_DEFS: HatDef[] = [
-  { value: 'white' as Hat, emoji: '⚪', label: 'Informativo', description: 'Fatti, dati e informazioni oggettive', color: 'border-gray-300 bg-gray-50 text-gray-800' },
-  { value: 'red' as Hat, emoji: '🔴', label: 'Emotivo', description: 'Intuizioni, emozioni e sensazioni', color: 'border-red-300 bg-red-50 text-red-800' },
-  { value: 'black' as Hat, emoji: '⚫', label: 'Critico', description: 'Difficoltà, rischi e punti deboli', color: 'border-gray-700 bg-gray-800 text-gray-100' },
-  { value: 'yellow' as Hat, emoji: '🟡', label: 'Ottimista', description: 'Vantaggi, benefici e opportunità', color: 'border-yellow-300 bg-yellow-50 text-yellow-800' },
-  { value: 'green' as Hat, emoji: '🟢', label: 'Creativo', description: 'Nuove idee, alternative e soluzioni', color: 'border-green-300 bg-green-50 text-green-800' },
-  { value: 'blue' as Hat, emoji: '🔵', label: 'Organizzativo', description: 'Processo, struttura e prossimi passi', color: 'border-blue-300 bg-blue-50 text-blue-800' },
-]
+// R-65 -> R-70-F-Ob: i sei cappelli. Le etichette («Informativo», «Emotivo», …)
+// sono di interfaccia; i `value` sono i nomi dei colori attesi dal contratto.
+const HAT_DEFS = [
+  { value: 'bianco', emoji: '⚪', label: 'Informativo', description: 'Fatti, dati e informazioni oggettive', color: 'border-gray-300 bg-gray-50 text-gray-800' },
+  { value: 'rosso', emoji: '🔴', label: 'Emotivo', description: 'Intuizioni, emozioni e sensazioni', color: 'border-red-300 bg-red-50 text-red-800' },
+  { value: 'nero', emoji: '⚫', label: 'Critico', description: 'Difficoltà, rischi e punti deboli', color: 'border-gray-700 bg-gray-800 text-gray-100' },
+  { value: 'giallo', emoji: '🟡', label: 'Ottimista', description: 'Vantaggi, benefici e opportunità', color: 'border-yellow-300 bg-yellow-50 text-yellow-800' },
+  { value: 'verde', emoji: '🟢', label: 'Creativo', description: 'Nuove idee, alternative e soluzioni', color: 'border-green-300 bg-green-50 text-green-800' },
+  { value: 'blu', emoji: '🔵', label: 'Organizzativo', description: 'Processo, struttura e prossimi passi', color: 'border-blue-300 bg-blue-50 text-blue-800' },
+] satisfies HatDef[]
 
-function getDefaultParams(actionId: AiActionId): Record<string, unknown> {
+// Esaustivita' nella direzione opposta a `satisfies`.
+//
+// `satisfies` garantisce che nessun valore dell'interfaccia sia fuori dal
+// contratto (il difetto di oggi). Queste righe garantiscono il contrario: che
+// nessun valore del contratto manchi dall'interfaccia (il difetto di domani, se
+// il backend aggiunge una lingua e il menu la omette in silenzio). Se `Exclude`
+// non collassa a `never`, il vincolo `T extends never` non e' soddisfatto e la
+// compilazione fallisce.
+type Exhaustive<T extends never> = T
+
+export type LengthsCoverContract = Exhaustive<
+  Exclude<Length, (typeof LENGTHS)[number]['value']>
+>
+export type LanguagesCoverContract = Exhaustive<
+  Exclude<Language, (typeof LANGUAGES)[number]['value']>
+>
+export type StylesCoverContract = Exhaustive<
+  Exclude<Style, (typeof STYLES)[number]['value']>
+>
+export type HatsCoverContract = Exhaustive<
+  Exclude<Hat, (typeof HAT_DEFS)[number]['value']>
+>
+
+function getDefaultParams(actionId: AiActionId): AiParams {
   switch (actionId) {
     case 'summarize':
     case 'generate':
     case 'generate-link':
-      return { length: 'medio' as Length }
+      return { length: 'medio' }
     case 'translate':
       return { target_language: LANGUAGES[0].value }
     case 'rewrite':
@@ -160,14 +196,14 @@ function HatSelector({
 }
 
 
-type LastCall = { input: string; params: Record<string, unknown> }
+type LastCall = { input: string; params: AiParams }
 
 export function AiActionDialog() {
   const actionId = useAiModal()
   const open = actionId !== null
   const action = actionId ? AI_ACTIONS[actionId] : null
 
-  const [params, setParams] = useState<Record<string, unknown>>({})
+  const [params, setParams] = useState<AiParams>({})
   const [input, setInput] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
   const [lastCall, setLastCall] = useState<LastCall | null>(null)
@@ -294,7 +330,7 @@ export function AiActionDialog() {
           <PillSelector<Length>
             label="Lunghezza output"
             options={LENGTHS}
-            value={(params.length as Length) ?? 'medio'}
+            value={params.length ?? 'medio'}
             onChange={(v) => setParams((p) => ({ ...p, length: v }))}
           />
         )
@@ -303,7 +339,7 @@ export function AiActionDialog() {
           <PillSelector<Language>
             label="Lingua di destinazione"
             options={LANGUAGES}
-            value={(params.target_language as Language) ?? LANGUAGES[0].value}
+            value={params.target_language ?? LANGUAGES[0].value}
             onChange={(v) => setParams((p) => ({ ...p, target_language: v }))}
           />
         )
@@ -312,14 +348,14 @@ export function AiActionDialog() {
           <PillSelector<Style>
             label="Stile"
             options={STYLES}
-            value={(params.style as Style) ?? STYLES[0].value}
+            value={params.style ?? STYLES[0].value}
             onChange={(v) => setParams((p) => ({ ...p, style: v }))}
           />
         )
       case 'critique':
         return (
           <HatSelector
-            value={(params.hat as Hat) ?? null}
+            value={params.hat ?? null}
             onChange={(v) => setParams((p) => ({ ...p, hat: v }))}
             />
         )

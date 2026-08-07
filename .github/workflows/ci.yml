@@ -68,7 +68,12 @@ jobs:
         run: pnpm lint
 
       - name: Controllo dei tipi
-        run: pnpm tsc --noEmit
+        # `tsc -b` e non `tsc --noEmit`: web/tsconfig.json e' un file di soli
+        # riferimenti (`"files": []` piu' `references`). Senza `-b` il compilatore
+        # non segue i progetti referenziati, riceve zero file in input ed esce 0
+        # qualunque cosa contenga src/ — questo step riportava verde senza
+        # leggere una riga. Il typecheck vero avveniva solo dentro `pnpm build`.
+        run: pnpm tsc -b
 
       - name: Test con copertura
         run: pnpm vitest run --coverage

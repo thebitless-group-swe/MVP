@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { AI_ACTIONS } from '@/lib/aiActions'
+import { AI_ACTIONS, type AiParams } from '@/lib/aiActions'
 import type { AiActionId } from '@/store/useEditorStore'
 
 const ALL_ACTION_IDS: AiActionId[] = [
@@ -12,11 +12,18 @@ const ALL_ACTION_IDS: AiActionId[] = [
   'generate-link',
 ]
 
-const FULL_PARAMS = {
+// Valori del CONTRATTO, non etichette di interfaccia. Prima di #02 questa
+// costante conteneva 'en', 'formal' e 'red': il test verificava che buildBody
+// copiasse i valori, non che fossero validi, e nel passare certificava il
+// difetto che faceva rispondere 422 «Traduci» e «Riscrivi».
+//
+// L'annotazione `: AiParams` e' cio' che impedisce il ritorno del difetto: da
+// qui in avanti un valore fuori contratto non compila.
+const FULL_PARAMS: AiParams = {
   length: 'medio',
-  target_language: 'en',
-  style: 'formal',
-  hat: 'red',
+  target_language: 'inglese',
+  style: 'formale',
+  hat: 'rosso',
 }
 
 describe('AI_ACTIONS — buildBody', () => {

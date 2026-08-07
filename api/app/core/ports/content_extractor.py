@@ -8,7 +8,7 @@ class ContentExtractorError(Exception):
 
 class ContentExtractor(ABC):
     """Porta per l'estrazione di contenuto testuale da URL."""
-    
+
     @abstractmethod
     async def extract(self, url: str) -> str:
         """
