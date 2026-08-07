@@ -81,6 +81,22 @@ async def test_estrazione_riuscita_restituisce_il_raw_content_invariato() -> Non
     assert result == pagina
 
 
+# aclose() → chiude la sessione HTTP del client Tavily
+async def test_aclose_chiude_la_sessione_del_client() -> None:
+    """La delega, asserita dove e' osservabile: su un doppio.
+
+    Su una `requests.Session` vera `close()` non lascia stato pubblico che un
+    test possa leggere, quindi il cablaggio verso il lifespan puo' solo
+    verificare che il metodo venga invocato (test_lifespan.py). Qui, con il
+    client finto, la delega e' verificabile in modo diretto.
+    """
+    extractor = make_extractor({"results": [{"raw_content": "x"}]})
+
+    await extractor.aclose()
+
+    extractor._client.close.assert_called_once_with()
+
+
 # Nessun risultato → pagina inesistente o vuota
 async def test_risultati_vuoti_segnalano_una_pagina_inesistente_o_vuota() -> None:
     """Asserire il tipo non basterebbe: da `extract` escono tre errori uguali.
