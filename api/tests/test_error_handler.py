@@ -1,4 +1,4 @@
-"""Test del global exception handler per HTTPException.
+"""Test dei global exception handler: HTTPException e RequestValidationError.
 
 Verifica che ogni HTTPException sollevata dalle route venga mappata sullo
 schema ErrorResponse(detail: str), come definito dal contratto API:
@@ -108,3 +108,135 @@ class TestGlobalExceptionHandler:
 
         body = response.json()
         assert set(body.keys()) == {"detail"}
+
+
+VALID_TEXT = "Un testo abbastanza lungo per superare la validazione di schema."
+
+
+class TestValidationExceptionHandler:
+    """Il 422 di Pydantic deve avere la stessa forma di ogni altro errore.
+
+    Senza handler dedicato FastAPI restituisce `detail` come array di oggetti,
+    mentre ErrorResponse lo dichiara stringa e lo store del frontend lo tipizza
+    `string | null`. Quegli oggetti contengono inoltre `type`, `loc`, `ctx` e
+    rimandano indietro `input`, cioe' il testo scritto dall'utente: R-110-F-Ob
+    vieta di esporre dettagli tecnici.
+    """
+
+    def test_detail_e_una_stringa(self, client: TestClient) -> None:
+        response = client.post("/api/summarize", json={"text": "corto"})
+
+        assert response.status_code == 422
+        assert isinstance(response.json()["detail"], str)
+
+    def test_body_ha_la_stessa_forma_degli_altri_errori(
+        self, client: TestClient
+    ) -> None:
+        response = client.post("/api/summarize", json={"text": "corto"})
+
+        assert set(response.json().keys()) == {"detail"}
+
+    def test_non_rimanda_indietro_l_input_dell_utente(
+        self, client: TestClient
+    ) -> None:
+        """`input` nella risposta di default e' il testo inviato dall'utente."""
+        segreto = "PAROLA-RISERVATA-DELL-UTENTE"
+
+        response = client.post("/api/summarize", json={"text": segreto[:9]})
+
+        assert segreto[:9] not in response.text
+
+    def test_non_espone_dettagli_tecnici(self, client: TestClient) -> None:
+        """Nessuna traccia della struttura interna dell'errore Pydantic."""
+        response = client.post(
+            "/api/translate", json={"text": "corto", "target_language": "it"}
+        )
+
+        for tecnicismo in ("loc", "ctx", "string_too_short", "literal_error", "body"):
+            assert tecnicismo not in response.text
+
+    @pytest.mark.parametrize(
+        ("path", "payload", "atteso"),
+        [
+            (
+                "/api/summarize",
+                {"text": "corto"},
+                "Il campo «testo» deve contenere almeno 10 caratteri.",
+            ),
+            (
+                "/api/translate",
+                {"text": VALID_TEXT, "target_language": "inglese_sbagliato"},
+                "Il valore indicato per «lingua di destinazione» non è fra quelli "
+                "ammessi: scegline uno fra le opzioni proposte.",
+            ),
+            (
+                "/api/rewrite",
+                {"text": VALID_TEXT},
+                "Il campo «stile» è obbligatorio.",
+            ),
+            (
+                "/api/generate-from-link",
+                {"url": "ftp://example.com"},
+                "Il link indicato non è un indirizzo valido: controlla che inizi "
+                "con http:// o https://.",
+            ),
+        ],
+    )
+    def test_messaggio_indica_causa_e_azione_correttiva(
+        self, client: TestClient, path: str, payload: dict, atteso: str
+    ) -> None:
+        """R-110-F-Ob: linguaggio naturale, causa e rimedio."""
+        response = client.post(path, json=payload)
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == atteso
+
+    def test_piu_campi_invalidi_producono_un_unico_messaggio(
+        self, client: TestClient
+    ) -> None:
+        response = client.post(
+            "/api/translate", json={"text": "corto", "target_language": "it"}
+        )
+
+        detail = response.json()["detail"]
+        assert isinstance(detail, str)
+        assert "«testo»" in detail
+        assert "«lingua di destinazione»" in detail
+
+    def test_corpo_non_json_produce_un_messaggio_leggibile(
+        self, client: TestClient
+    ) -> None:
+        response = client.post(
+            "/api/summarize",
+            content=b"{non e json",
+            headers={"content-type": "application/json"},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == (
+            "Il corpo della richiesta non è in formato JSON valido."
+        )
+
+    def test_il_contratto_dichiara_error_response_per_il_422(self) -> None:
+        """Comportamento e contratto vanno cambiati insieme.
+
+        Se lo schema restasse HTTPValidationError, openapi.json descriverebbe
+        una forma che l'applicazione non produce piu' e `pnpm types:gen`
+        genererebbe tipi sbagliati.
+        """
+        schema = app.openapi()
+
+        for path in (
+            "/api/summarize",
+            "/api/generate",
+            "/api/generate-from-link",
+            "/api/translate",
+            "/api/rewrite",
+            "/api/grammar",
+            "/api/critique",
+        ):
+            risposta = schema["paths"][path]["post"]["responses"]["422"]
+            riferimento = risposta["content"]["application/json"]["schema"]["$ref"]
+            assert riferimento == "#/components/schemas/ErrorResponse"
+
+        assert "HTTPValidationError" not in schema["components"]["schemas"]

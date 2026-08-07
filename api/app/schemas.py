@@ -17,6 +17,21 @@ Hat = Literal["bianco", "rosso", "giallo", "nero", "verde", "blu"]
 # Lunghezza minima del testo accettato dalle funzioni AI (R-81).
 MIN_TEXT_LENGTH = 10
 
+# Etichette in italiano dei campi dei DTO, usate per comporre i messaggi di
+# errore 422 in linguaggio naturale (R-110-F-Ob). Stanno qui, accanto ai campi
+# che descrivono, cosi' che aggiungere un campo e la sua etichetta siano la
+# stessa modifica. Un campo assente da questa mappa produce un messaggio
+# generico: meglio vago che tecnico.
+FIELD_LABELS: dict[str, str] = {
+    "text": "testo",
+    "prompt": "istruzioni",
+    "url": "link",
+    "target_language": "lingua di destinazione",
+    "style": "stile",
+    "hat": "cappello",
+    "length": "lunghezza",
+}
+
 
 class TextRequest(BaseModel):
     text: str = Field(min_length=MIN_TEXT_LENGTH)

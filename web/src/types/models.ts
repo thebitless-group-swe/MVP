@@ -12,8 +12,13 @@ export type TranslateRequest = components['schemas']['TranslateRequest'];
 export type RewriteRequest = components['schemas']['RewriteRequest'];
 export type GrammarRequest = components['schemas']['GrammarRequest'];
 export type CritiqueRequest = components['schemas']['CritiqueRequest'];
-export type ValidationError = components['schemas']['ValidationError'];
-export type HTTPValidationError = components['schemas']['HTTPValidationError'];
+
+// Forma unica di ogni risposta di errore dell'API: `{ detail: string }`.
+// Prima venivano ri-esportati `ValidationError` e `HTTPValidationError`, gli
+// schemi che FastAPI generava in automatico per il 422 — nessuno dei due era
+// usato da alcun modulo, e descrivevano un `detail` come array di oggetti che
+// il backend non produce piu'.
+export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Enum del contratto, usati dai dropdown della UI.
 export type Language = TranslateRequest['target_language'];
