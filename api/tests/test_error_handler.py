@@ -113,6 +113,7 @@ class TestGlobalExceptionHandler:
 VALID_TEXT = "Un testo abbastanza lungo per superare la validazione di schema."
 
 
+@pytest.mark.usefixtures("content_extractor_override")
 class TestValidationExceptionHandler:
     """Il 422 di Pydantic deve avere la stessa forma di ogni altro errore.
 

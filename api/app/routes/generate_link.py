@@ -3,8 +3,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from ..infrastructure.adapters.tavily_extractor import TavilyExtractor
-from ..llm import get_llm_client
+from ..core.ports.content_extractor import ContentExtractor
+from ..llm import get_content_extractor, get_llm_client
 from ..llm.client import LLMClient
 from ..llm.fetch_url import FetchError, fetch_and_extract, validate_link
 from ..llm.prompts import build_generate_messages
@@ -28,6 +28,7 @@ async def generate_from_link(
     payload: LinkRequest,
     request: Request,
     client: LLMClient = Depends(get_llm_client),
+    extractor: ContentExtractor = Depends(get_content_extractor),
 ) -> StreamingResponse:
     url = str(payload.url)
     try:
@@ -35,7 +36,6 @@ async def generate_from_link(
     except FetchError as exc:
         raise HTTPException(status_code=400, detail=_URL_TOO_LONG_DETAIL) from exc
 
-    extractor = TavilyExtractor()
     try:
         text = await fetch_and_extract(url, extractor)
     except FetchError as exc:

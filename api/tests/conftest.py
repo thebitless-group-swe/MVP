@@ -1,10 +1,11 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
+from app.llm import get_content_extractor
 from app.llm.client import LLMClient
 from app.main import app
 
@@ -51,6 +52,21 @@ def dummy_content_extractor() -> ContentExtractor:
 @pytest.fixture
 def failing_content_extractor() -> ContentExtractor:
     return FailingContentExtractor()
+
+
+@pytest.fixture
+def content_extractor_override() -> Iterator[None]:
+    """Fa risolvere `get_content_extractor` su un doppio, per la durata del test.
+
+    Serve a ogni test che chiama /api/generate-from-link e non sta verificando
+    la configurazione. FastAPI risolve le dipendenze prima di validare il
+    corpo: senza override, in un ambiente senza TAVILY_API_KEY la rotta
+    risponde 503 anche a una richiesta malformata, e un test sulla validazione
+    non arriva mai a esercitare cio' che vuole verificare.
+    """
+    app.dependency_overrides[get_content_extractor] = DummyContentExtractor
+    yield
+    app.dependency_overrides.pop(get_content_extractor, None)
 
 @pytest.fixture
 def sse_chunks() -> str:
