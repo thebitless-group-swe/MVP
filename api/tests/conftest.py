@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
 from app.llm.client import LLMClient
 from app.main import app
-from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

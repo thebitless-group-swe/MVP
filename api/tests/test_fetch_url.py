@@ -1,61 +1,37 @@
-from unittest.mock import MagicMock, patch
+"""Test dello use case di estrazione contenuto da link.
+
+`fetch_and_extract` dipende solo dalla porta `ContentExtractor`: i test usano le
+fixture di conftest.py e non conoscono l'adattatore concreto. I due comportamenti
+dello use case sono la delega alla porta e la traduzione dell'errore di porta in
+`FetchError`; la distinzione fra le cause del fallimento (pagina vuota, contenuto
+assente, eccezione del client) appartiene all'adattatore ed e' coperta in
+test_tavily_extractor.py.
+"""
 
 import pytest
 
+from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
 from app.llm.fetch_url import MAX_URL_LENGTH, FetchError, fetch_and_extract, validate_link
 
-SAMPLE_CONTENT = "Questo è un contenuto di esempio estratto dalla pagina."
+
+# Extractor che estrae correttamente → fetch_and_extract ritorna il contenuto della porta
+async def test_fetch_and_extract_returns_extractor_content(
+    dummy_content_extractor: ContentExtractor,
+) -> None:
+    result = await fetch_and_extract("https://example.com", dummy_content_extractor)
+
+    assert result == "Contenuto di esempio per il test."
 
 
-# Client Tavily mockato → ritorna contenuto di esempio → fetch_and_extract ritorna testo non vuoto
-@patch("app.llm.fetch_url.TavilyClient")
-async def test_fetch_and_extract_returns_text(mock_tavily_client: MagicMock) -> None:
-    mock_instance = MagicMock()
-    mock_instance.extract.return_value = {
-        "results": [{"raw_content": SAMPLE_CONTENT}]
-    }
-    mock_tavily_client.return_value = mock_instance
+# Extractor che fallisce → l'errore di porta diventa FetchError, con messaggio e causa preservati
+async def test_fetch_and_extract_wraps_extractor_error_in_fetch_error(
+    failing_content_extractor: ContentExtractor,
+) -> None:
+    with pytest.raises(FetchError) as exc_info:
+        await fetch_and_extract("https://example.com", failing_content_extractor)
 
-    result = await fetch_and_extract("https://example.com")
-
-    assert result == SAMPLE_CONTENT
-
-
-# Client solleva errore (es. eccezione di rete) → fetch_and_extract propaga errore gestito
-@patch("app.llm.fetch_url.TavilyClient")
-async def test_fetch_and_extract_client_exception_raises(mock_tavily_client: MagicMock) -> None:
-    mock_instance = MagicMock()
-    mock_instance.extract.side_effect = Exception("boom")
-    mock_tavily_client.return_value = mock_instance
-
-    with pytest.raises(FetchError):
-        await fetch_and_extract("https://example.com")
-
-
-# Client solleva errore (URL non valido / no content) → fetch_and_extract propaga errore gestito
-@patch("app.llm.fetch_url.TavilyClient")
-async def test_fetch_and_extract_no_content_raises(mock_tavily_client: MagicMock) -> None:
-    mock_instance = MagicMock()
-    mock_instance.extract.return_value = {"results": []}
-    mock_tavily_client.return_value = mock_instance
-
-    with pytest.raises(FetchError):
-        await fetch_and_extract("https://invalid-url")
-
-
-# Input lungo → output troncato ≤ cap
-@patch("app.llm.fetch_url.TavilyClient")
-async def test_fetch_and_extract_truncates_long_content(mock_tavily_client: MagicMock) -> None:
-    long_content = "a" * 20_000
-    mock_instance = MagicMock()
-    mock_instance.extract.return_value = {
-        "results": [{"raw_content": long_content}]
-    }
-    mock_tavily_client.return_value = mock_instance
-
-    result = await fetch_and_extract("https://example.com")
-
-    assert len(result) <= 12_000
+    assert str(exc_info.value) == "Errore simulato durante l'estrazione"
+    assert isinstance(exc_info.value.__cause__, ContentExtractorError)
 
 
 # Schema e forma dell'URL sono ora validati da HttpUrl in LinkRequest: la

@@ -1,15 +1,21 @@
 """Test B-01: helper unico per lo streaming SSE (app/llm/streaming.py)."""
 from collections.abc import AsyncIterator
 
+import httpx
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.llm import get_llm_client
-from app.llm.client import LLMClient
+from app.llm.client import LiteLLMClient, LLMClient
 from app.llm.errors import LLMProviderError
-from app.llm.streaming import SERVICE_UNAVAILABLE_DETAIL, sse_response
+from app.llm.streaming import (
+    SERVICE_UNAVAILABLE_DETAIL,
+    SSE_ERROR_EVENT,
+    sse_response,
+)
 from app.main import app
+from app.settings import Settings
 
 VALID_TEXT = "Un testo abbastanza lungo per superare la validazione di schema."
 
@@ -78,6 +84,49 @@ async def test_chunks_are_formatted_as_sse_events() -> None:
     assert body == "data: alfa\n\ndata: beta\n\ndata: [DONE]\n\n"
 
 
+# Un chunk multiriga richiede una riga `data:` per ogni riga del contenuto: il
+# valore di un campo SSE non puo' contenere a capo. Con il formato precedente
+# le righe successive alla prima perdevano il prefisso e il client le scartava.
+async def test_multiline_chunk_becomes_one_data_line_per_line() -> None:
+    stream = TrackedStream(["# Titolo\n\n- uno\n- due"])
+
+    response = await sse_response(_ConnectedRequest(), stream, "test")  # type: ignore[arg-type]
+    body = await _collect(response)
+
+    assert body == (
+        "data: # Titolo\n"
+        "data: \n"
+        "data: - uno\n"
+        "data: - due\n"
+        "\n"
+        "data: [DONE]\n\n"
+    )
+
+
+# Un chunk che e' solo un a capo produce due righe `data:` vuote: e' l'evento
+# che nel formato precedente spariva del tutto.
+async def test_newline_only_chunk_survives() -> None:
+    stream = TrackedStream(["\n"])
+
+    response = await sse_response(_ConnectedRequest(), stream, "test")  # type: ignore[arg-type]
+    body = await _collect(response)
+
+    assert body == "data: \ndata: \n\ndata: [DONE]\n\n"
+
+
+# Il contenuto generato dall'LLM puo' somigliare a un campo SSE. Deve viaggiare
+# come valore di `data:`, cosi' che il client -- che fa dispatch sul nome del
+# campo -- lo consegni all'utente come testo e non come errore.
+async def test_chunk_that_looks_like_an_event_field_travels_as_data() -> None:
+    stream = TrackedStream(["event: error"])
+
+    response = await sse_response(_ConnectedRequest(), stream, "test")  # type: ignore[arg-type]
+    body = await _collect(response)
+
+    assert body == "data: event: error\n\ndata: [DONE]\n\n"
+    assert not body.startswith("event:")
+
+
 async def test_provider_error_before_first_chunk_raises_503() -> None:
     stream = TrackedStream(["alfa"], raise_after=0)
 
@@ -108,6 +157,38 @@ async def test_stream_is_closed_after_normal_completion() -> None:
     assert stream.closed
 
 
+# End-to-end sulla cattura reale del gateway LiteLLM: la fixture contiene un
+# chunk che e' un solo a capo (riga 5), cioe' proprio il caso che il formato
+# precedente faceva sparire. Percorso completo LiteLLMClient -> sse_response.
+async def test_real_fixture_preserves_the_newline_chunk(sse_chunks: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=sse_chunks.encode())
+
+    client = LiteLLMClient(Settings())
+    client._client = httpx.AsyncClient(
+        base_url=client._settings.litellm_base_url,
+        transport=httpx.MockTransport(handler),
+    )
+
+    response = await sse_response(
+        _ConnectedRequest(),  # type: ignore[arg-type]
+        client.stream([{"role": "user", "content": "x"}]),
+        "test",
+    )
+    body = await _collect(response)
+    await client.aclose()
+
+    # I chunk della fixture sono ["Ciao", " mondo", "\n"].
+    assert body == (
+        "data: Ciao\n\n"
+        "data:  mondo\n\n"
+        "data: \ndata: \n\n"
+        "data: [DONE]\n\n"
+    )
+    # Il terzo evento esiste e non e' scomparso, come invece accadeva prima.
+    assert "data: \ndata: \n\n" in body
+
+
 class _MidStreamErrorClient(LLMClient):
     """Emette un chunk valido, poi fallisce a meta' stream."""
 
@@ -123,12 +204,24 @@ class TestMidStreamError:
         yield
         app.dependency_overrides.clear()
 
-    def test_mid_stream_error_returns_truncated_200(self, client: TestClient) -> None:
+    #Gli header (200) sono gia' partiti quando il provider fallisce, quindi lo
+    #status non puo' cambiare: cio' che distingue il fallimento e' l'evento
+    #terminale nel corpo. Prima di #03 questo test asseriva la sola ASSENZA di
+    #[DONE], cioe' certificava come corretto un errore indistinguibile da una
+    #chiusura riuscita -- lo stesso difetto che l'analisi rimprovera altrove ai
+    #test che ratificano invece di intercettare.
+    def test_mid_stream_error_emits_terminal_error_event(
+        self, client: TestClient
+    ) -> None:
         response = client.post("/api/summarize", json={"text": VALID_TEXT})
 
         assert response.status_code == 200
         assert "data: parziale\n\n" in response.text
-        #Lo stream si interrompe prima del marker di fine
+        #Il fallimento e' dichiarato, non desumibile dall'assenza di [DONE]
+        assert response.text.endswith(SSE_ERROR_EVENT)
+        assert "event: error\n" in response.text
+        assert SERVICE_UNAVAILABLE_DETAIL in response.text
+        #E resta distinguibile dal successo
         assert "[DONE]" not in response.text
 
     def test_mid_stream_error_does_not_leak_details(

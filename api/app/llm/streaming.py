@@ -9,7 +9,32 @@ from .errors import LLMProviderError
 #Messaggio vincolato da UC 62: non modificare, tradurre o abbreviare.
 SERVICE_UNAVAILABLE_DETAIL = "Servizio temporaneamente non disponibile"
 
+
+def _format_sse(chunk: str) -> str:
+    """Formatta un chunk come evento SSE conforme alla specifica.
+
+    Nella specifica SSE un evento e' una o piu' righe `data:` chiuse da una riga
+    vuota, e il valore di un campo non puo' contenere a capo. Emettere
+    `f"data: {chunk}\\n\\n"` con un chunk multiriga produce quindi righe prive di
+    prefisso, che il client scarta: non si perdeva il solo `\\n`, si perdeva
+    tutto il testo che lo seguiva. Poiche' tutte le funzioni AI producono
+    Markdown (titoli, elenchi, paragrafi, blocchi di codice), la perdita era
+    sistematica su ogni risposta non banale.
+
+    Una riga `data:` per ogni riga del contenuto; il client le riunisce con
+    `\\n`. Un contenuto di una sola riga produce esattamente il formato
+    precedente, quindi il cambiamento e' trasparente per i chunk senza a capo.
+    """
+    return "".join(f"data: {line}\n" for line in chunk.split("\n")) + "\n"
+
+
 SSE_DONE_EVENT = "data: [DONE]\n\n"
+
+#Evento terminale di errore: e' cio' che rende il fallimento a meta' stream
+#distinguibile dal completamento. Senza, il client vedeva solo la chiusura
+#della connessione e la interpretava come successo, mostrando all'utente un
+#testo troncato senza alcun segnale (R-80-F-Ob, R-110-F-Ob, UC 72).
+SSE_ERROR_EVENT = "event: error\n" + _format_sse(SERVICE_UNAVAILABLE_DETAIL)
 
 _module_logger = logging.getLogger(__name__)
 
@@ -53,20 +78,22 @@ async def sse_response(
                 if await request.is_disconnected():
                     log.info("Client disconnesso, chiudo stream %s", log_label)
                     return
-                #Stringa formattata SSE; "\n\n" separa gli eventi, standard SSE
-                yield f"data: {first_chunk}\n\n"
+                yield _format_sse(first_chunk)
 
                 async for chunk in stream:
                     if await request.is_disconnected():
                         log.info("Client disconnesso, chiudo stream %s", log_label)
                         return
-                    yield f"data: {chunk}\n\n"
+                    yield _format_sse(chunk)
             yield SSE_DONE_EVENT
         except LLMProviderError:
             #Errore mid-stream: gli header (200) sono gia' partiti, non e'
-            #possibile rispondere 503. Logghiamo server-side e chiudiamo in
-            #modo pulito, senza propagare stacktrace/dettagli al client.
+            #possibile rispondere 503. Emettiamo un evento terminale di errore
+            #-- il client lo distingue da [DONE] e avvisa l'utente -- e
+            #logghiamo server-side, senza propagare stacktrace o dettagli del
+            #provider nel corpo della risposta.
             log.exception("Errore provider LLM durante stream %s", log_label)
+            yield SSE_ERROR_EVENT
             return
         finally:
             await stream.aclose()

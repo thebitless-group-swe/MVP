@@ -202,16 +202,30 @@ describe('AiActionDialog — testo insufficiente (R-81)', () => {
   })
 })
 
-describe('AiActionDialog — dropdown lingua', () => {
-  it('mostra le opzioni del tipo Language', () => {
+describe('AiActionDialog — lingue di destinazione (R-58-F-Ob)', () => {
+  it('mostra esattamente le quattro lingue dell AdR', () => {
     act(() => { useEditorStore.getState().setAiModal('translate') })
     render(<AiActionDialog />)
 
-    expect(screen.getByRole('radio', { name: 'Italiano' })).toBeInTheDocument()
+    expect(screen.getAllByRole('radio')).toHaveLength(4)
     expect(screen.getByRole('radio', { name: 'Inglese' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Francese' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Tedesco' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Spagnolo' })).toBeInTheDocument()
   })
 
-  it('selezione lingua → target_language nel body', async () => {
+  // UC63.1 elenca quattro lingue di destinazione e l'italiano non e' fra
+  // queste. Prima di #02 questo test asseriva la presenza di «Italiano»:
+  // certificava un'opzione fuori specifica, il cui valore ('it') era anche il
+  // default inviato al backend e rifiutato con 422.
+  it('non offre l italiano come lingua di destinazione', () => {
+    act(() => { useEditorStore.getState().setAiModal('translate') })
+    render(<AiActionDialog />)
+
+    expect(screen.queryByRole('radio', { name: 'Italiano' })).not.toBeInTheDocument()
+  })
+
+  it('selezione lingua → valore di contratto nel body, non codice ISO', async () => {
     act(() => { useEditorStore.getState().setAiModal('translate') })
     render(<AiActionDialog />)
 
@@ -220,7 +234,32 @@ describe('AiActionDialog — dropdown lingua', () => {
 
     expect(mockStart).toHaveBeenCalledWith({
       endpoint: expect.stringContaining('/api/translate'),
-      body: expect.objectContaining({ target_language: expect.any(String) }),
+      body: { text: ACTIVE_TEXT, target_language: 'inglese' },
+    })
+  })
+})
+
+describe('AiActionDialog — stili di riscrittura (R-60-F-Ob)', () => {
+  it('mostra esattamente i tre stili dell AdR', () => {
+    act(() => { useEditorStore.getState().setAiModal('rewrite') })
+    render(<AiActionDialog />)
+
+    expect(screen.getAllByRole('radio')).toHaveLength(3)
+    expect(screen.getByRole('radio', { name: 'Formale' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Informale' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Accademico' })).toBeInTheDocument()
+  })
+
+  it('selezione stile → valore di contratto nel body', async () => {
+    act(() => { useEditorStore.getState().setAiModal('rewrite') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Accademico' }))
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).toHaveBeenCalledWith({
+      endpoint: expect.stringContaining('/api/rewrite'),
+      body: { text: ACTIVE_TEXT, style: 'accademico' },
     })
   })
 })
@@ -272,7 +311,10 @@ describe('AiActionDialog — critique (cappelli)', () => {
     radios.forEach((r) => expect(r).toHaveAttribute('aria-checked', 'false'))
   })
 
-  it('click cappello → hat corretto nel body', async () => {
+  // L'etichetta e' di interfaccia («Critico»), il valore e' di contratto
+  // («nero»): e' la mappatura che #02 corregge, quindi va asserita sul valore
+  // esatto e non su expect.any(String), che passava anche con 'black'.
+  it('click cappello → valore di contratto nel body, non nome inglese', async () => {
     act(() => { useEditorStore.getState().setAiModal('critique') })
     render(<AiActionDialog />)
 
@@ -281,7 +323,7 @@ describe('AiActionDialog — critique (cappelli)', () => {
 
     expect(mockStart).toHaveBeenCalledWith({
       endpoint: expect.stringContaining('/api/critique'),
-      body: expect.objectContaining({ hat: expect.any(String) }),
+      body: { text: ACTIVE_TEXT, hat: 'nero' },
     })
   })
 

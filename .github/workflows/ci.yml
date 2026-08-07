@@ -28,6 +28,16 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
+      - name: Il contratto OpenAPI committato e' aggiornato
+        # openapi.json e' generato ma versionato: e' la sorgente da cui il
+        # frontend deriva i propri tipi. Se una PR cambia uno schema senza
+        # riesportarlo, il contratto committato mente e il frontend continua a
+        # compilare contro tipi stantii. Rigenerare e pretendere zero diff e'
+        # l'unico modo di accorgersene qui invece che a runtime.
+        run: |
+          uv run python -m app.export_openapi
+          git diff --exit-code openapi.json
+
       - name: Test con copertura
         # Soglia MPC-CC del Piano di Qualifica.
         run: uv run pytest --cov=app --cov-report=xml --cov-fail-under=70
@@ -57,7 +67,10 @@ jobs:
       - name: Installa Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # La versione sta nel .nvmrc, non qui: e' lo stesso file che legge
+          # `nvm use` in locale. Duplicarla significherebbe che un giorno la CI
+          # verifica su una versione di Node che nessuno sviluppatore usa.
+          node-version-file: .nvmrc
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
@@ -67,8 +80,22 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: I tipi TypeScript sono allineati al contratto
+        # Prima del typecheck, non dopo: se src/types/api.ts e' stantio, `tsc -b`
+        # passa comunque — sta verificando il codice contro un contratto che non
+        # esiste piu'. E' esattamente cosi' che un `as` rimosso smette di
+        # proteggere senza che nessuno se ne accorga.
+        run: |
+          pnpm types:gen
+          git diff --exit-code src/types/api.ts
+
       - name: Controllo dei tipi
-        run: pnpm tsc --noEmit
+        # `tsc -b` e non `tsc --noEmit`: web/tsconfig.json e' un file di soli
+        # riferimenti (`"files": []` piu' `references`). Senza `-b` il compilatore
+        # non segue i progetti referenziati, riceve zero file in input ed esce 0
+        # qualunque cosa contenga src/ — questo step riportava verde senza
+        # leggere una riga. Il typecheck vero avveniva solo dentro `pnpm build`.
+        run: pnpm tsc -b
 
       - name: Test con copertura
         run: pnpm vitest run --coverage

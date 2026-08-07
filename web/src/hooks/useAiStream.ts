@@ -54,9 +54,25 @@ export function useAiStream(): AiStreamHandle {
       }
 
       const reader = response.body!.getReader()
-      for await (const chunk of parseSseStream(reader)) {
+
+      // Il fallimento a meta' stream non e' piu' desumibile dalla chiusura:
+      // parseSseStream lo dichiara con un evento dedicato. Su quel percorso si
+      // chiama setError e NON finishStreaming, altrimenti un testo troncato
+      // verrebbe presentato come completo (R-80-F-Ob, R-110-F-Ob, UC72).
+      let failed = false
+      for await (const event of parseSseStream(reader)) {
         if (controller.signal.aborted) break
-        useEditorStore.getState().appendChunk(chunk)
+        if (event.type === 'error') {
+          failed = true
+          useEditorStore.getState().setError(event.message)
+          break
+        }
+        useEditorStore.getState().appendChunk(event.data)
+      }
+
+      if (failed) {
+        setStatus('error')
+        return
       }
 
       setStatus('done')

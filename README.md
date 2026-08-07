@@ -2,6 +2,26 @@
 
 Proof of Concept per validare la pipeline LLM streaming end-to-end contro un provider LiteLLM (compatibile OpenAI).
 
+## Prerequisiti
+
+| Strumento | Versione | Vincolata da |
+|---|---|---|
+| Node | **22** (`>=22 <23`) | `.nvmrc`, `engines` in `web/package.json` |
+| pnpm | **>=11** | `packageManager` ed `engines` in `web/package.json` |
+| Python | 3.12 | `api/.python-version` |
+
+**Il package manager ufficiale del frontend è `pnpm`.** Non usare `npm install`: genera un
+albero di dipendenze diverso da quello che risolve la CI, e i bug che ne nascono si
+manifestano solo in pipeline. Per lo stesso motivo nel repository esiste un solo
+lockfile, `web/pnpm-lock.yaml`.
+
+Node **deve** essere la 22: su versioni più recenti parte della suite frontend fallisce.
+Con [nvm](https://github.com/nvm-sh/nvm) la versione giusta si prende dal `.nvmrc`:
+
+```sh
+nvm use    # legge .nvmrc dalla root
+```
+
 ## Setup
 
 ```sh
@@ -38,9 +58,26 @@ pnpm dev
 pnpm tsc --noEmit
 ```
 
-Rigenerare i tipi TypeScript dall'OpenAPI (richiede API in esecuzione su `localhost:8000`):
+## Il contratto OpenAPI
+
+`api/openapi.json` è generato dal codice ma **versionato**, e `web/src/types/api.ts` è
+generato da lui. Committarli entrambi ha due effetti: `pnpm types:gen` gira senza un
+server attivo, e una revisione vede nel diff della PR che l'API è cambiata.
+
+Il prezzo è che possono restare indietro. Chi tocca uno schema, una route o un enum del
+backend rigenera entrambi nello stesso commit:
 
 ```sh
-cd web
-pnpm types:gen
+cd api && uv run python -m app.export_openapi   # aggiorna api/openapi.json
+cd ../web && pnpm types:gen                     # aggiorna web/src/types/api.ts
 ```
+
+Due guardie impediscono di dimenticarsene:
+
+- `api/tests/test_openapi_contract.py` fallisce in locale se `openapi.json` non
+  corrisponde a ciò che l'app produce adesso;
+- la CI rigenera entrambi i file e pretende `git diff --exit-code`, quindi una PR che
+  cambia l'API senza riesportarla non passa.
+
+Senza queste guardie il frontend continuerebbe a compilare contro tipi stantii: `tsc`
+resta verde perché sta verificando il codice contro un contratto che non esiste più.

@@ -3,7 +3,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from ..core.ports.content_extractor import ContentExtractor
 from ..infrastructure.adapters.tavily_extractor import TavilyExtractor
 from ..llm import get_llm_client
 from ..llm.client import LLMClient
