@@ -3,6 +3,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from ..core.ports.content_extractor import ContentExtractor
+from ..infrastructure.adapters.tavily_extractor import TavilyExtractor
 from ..llm import get_llm_client
 from ..llm.client import LLMClient
 from ..llm.fetch_url import FetchError, fetch_and_extract, validate_link
@@ -11,10 +13,8 @@ from ..llm.streaming import sse_response
 from ..schemas import LinkRequest
 
 router = APIRouter(prefix="/api", tags=["generate-link"])
-
 logger = logging.getLogger(__name__)
 
-#Messaggi in linguaggio naturale con azione correttiva (R-8-Q-Ob)
 _URL_TOO_LONG_DETAIL = (
     "L'indirizzo del link è troppo lungo. Incollane uno più breve e riprova."
 )
@@ -30,15 +30,15 @@ async def generate_from_link(
     request: Request,
     client: LLMClient = Depends(get_llm_client),
 ) -> StreamingResponse:
-    #Forma dell'url gia' validata da HttpUrl in LinkRequest: resta la lunghezza
     url = str(payload.url)
     try:
         validate_link(url)
     except FetchError as exc:
         raise HTTPException(status_code=400, detail=_URL_TOO_LONG_DETAIL) from exc
 
+    extractor = TavilyExtractor()
     try:
-        text = await fetch_and_extract(url)
+        text = await fetch_and_extract(url, extractor)
     except FetchError as exc:
         logger.exception("Estrazione contenuto fallita per il link richiesto")
         raise HTTPException(status_code=503, detail=_FETCH_FAILED_DETAIL) from exc
