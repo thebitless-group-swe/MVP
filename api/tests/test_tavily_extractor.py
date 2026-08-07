@@ -17,9 +17,35 @@ import threading
 import time
 from unittest.mock import MagicMock
 
+import pytest
+
+from app.core.ports.content_extractor import ContentExtractorError
 from app.infrastructure.adapters.tavily_extractor import MAX_CHARS, TavilyExtractor
 
 API_KEY = "chiave-di-test"
+
+#Prefisso dei soli errori sollevati dal blocco `try` attorno alla chiamata a
+#Tavily. I due errori di contenuto vuoto nascono dopo, fuori dal `try`: se un
+#giorno finissero dentro, lo si vedrebbe da questo prefisso comparire nel loro
+#messaggio, ed e' quello che le asserzioni qui sotto sorvegliano.
+PREFISSO_ERRORE_CLIENT = "Errore durante l'estrazione:"
+
+
+def test_il_costruttore_senza_chiave_rifiuta_di_costruire_l_adattatore() -> None:
+    """La guardia della riga 19 e' difesa in profondita', non il percorso normale.
+
+    Attraverso `get_content_extractor` non si arriva mai qui: il provider
+    controlla la chiave per primo e risponde 503. Questa guardia serve a chi
+    costruisce l'adattatore altrove — un secondo composition root, uno script —
+    e senza di essa otterrebbe un `TavilyClient` costruito su una chiave vuota,
+    che fallisce molto piu' tardi e per un motivo che non nomina la causa.
+    """
+    with pytest.raises(ContentExtractorError) as exc_info:
+        TavilyExtractor(api_key="")
+
+    #Il messaggio nomina la variabile d'ambiente: e' cio' che rende l'errore
+    #azionabile da chi fa il deploy senza leggere il sorgente.
+    assert "TAVILY_API_KEY" in str(exc_info.value)
 
 
 def make_extractor(response: dict) -> TavilyExtractor:
@@ -28,6 +54,100 @@ def make_extractor(response: dict) -> TavilyExtractor:
     extractor._client = MagicMock()
     extractor._client.extract.return_value = response
     return extractor
+
+
+def make_extractor_guasto(errore: Exception) -> TavilyExtractor:
+    """TavilyExtractor il cui client solleva invece di rispondere."""
+    extractor = TavilyExtractor(api_key=API_KEY)
+    extractor._client = MagicMock()
+    extractor._client.extract.side_effect = errore
+    return extractor
+
+
+# Estrazione riuscita → l'adattatore restituisce il raw_content, invariato
+async def test_estrazione_riuscita_restituisce_il_raw_content_invariato() -> None:
+    """Il percorso felice, asserito per quello che e'.
+
+    I test su `to_thread` piu' sotto attraversano gia' questa riga, ma lo fanno
+    di striscio: verificano dove gira la chiamata, non che cosa torna. Un
+    troncamento sbagliato o un `raw_content` scambiato con un altro campo li
+    lascerebbe verdi tutti quanti.
+    """
+    pagina = "# Titolo\n\nCorpo della pagina estratta."
+    extractor = make_extractor({"results": [{"raw_content": pagina}]})
+
+    result = await extractor.extract("https://example.com")
+
+    assert result == pagina
+
+
+# Nessun risultato → pagina inesistente o vuota
+async def test_risultati_vuoti_segnalano_una_pagina_inesistente_o_vuota() -> None:
+    """Asserire il tipo non basterebbe: da `extract` escono tre errori uguali.
+
+    `ContentExtractorError` e' l'unico tipo che questo metodo solleva, quindi
+    un test sul solo tipo passerebbe anche se la pagina vuota finisse a
+    segnalare il guasto del client. E' il messaggio a distinguere le tre cause,
+    ed e' sul messaggio che il test si appoggia.
+    """
+    extractor = make_extractor({"results": []})
+
+    with pytest.raises(ContentExtractorError) as exc_info:
+        await extractor.extract("https://example.com")
+
+    messaggio = str(exc_info.value)
+    assert "non esistere o essere vuota" in messaggio
+    assert not messaggio.startswith(PREFISSO_ERRORE_CLIENT)
+
+
+# Risultato presente ma senza testo → pagina senza contenuto estraibile
+@pytest.mark.parametrize(
+    ("primo_risultato", "caso"),
+    [
+        ({"raw_content": ""}, "campo presente ma vuoto"),
+        ({}, "campo del tutto assente"),
+    ],
+)
+async def test_raw_content_assente_o_vuoto_segnala_una_pagina_senza_testo(
+    primo_risultato: dict, caso: str
+) -> None:
+    """Due forme diverse della stessa risposta, e Tavily le produce entrambe.
+
+    `results[0].get("raw_content", "")` le appiattisce sullo stesso valore: il
+    parametro serve a impedire che il default sparisca dal `get` senza che
+    nulla se ne accorga.
+    """
+    extractor = make_extractor({"results": [primo_risultato]})
+
+    with pytest.raises(ContentExtractorError) as exc_info:
+        await extractor.extract("https://example.com")
+
+    messaggio = str(exc_info.value)
+    assert "non contiene testo" in messaggio, caso
+    assert not messaggio.startswith(PREFISSO_ERRORE_CLIENT), caso
+
+
+# Il client solleva → l'errore diventa un errore della porta, causa conservata
+async def test_un_errore_del_client_diventa_un_errore_di_porta() -> None:
+    """E' il confine dell'esagono: fuori di qui nessuno conosce Tavily.
+
+    Il `from exc` conta quanto la traduzione. La rotta registra lo stacktrace e
+    mostra all'utente un messaggio pulito (R-110-F-Ob): senza la causa
+    concatenata, lato server resterebbe soltanto il messaggio riscritto e la
+    diagnosi ripartirebbe da zero. Stesso idioma di test_fetch_url.py.
+
+    Il test prova anche che l'eccezione sopravvive al salto di thread di
+    `asyncio.to_thread`, che e' cio' che la #05 ha introdotto sotto a questa riga.
+    """
+    guasto = ConnectionError("connessione rifiutata dall'host")
+    extractor = make_extractor_guasto(guasto)
+
+    with pytest.raises(ContentExtractorError) as exc_info:
+        await extractor.extract("https://example.com")
+
+    assert str(exc_info.value).startswith(PREFISSO_ERRORE_CLIENT)
+    assert "connessione rifiutata dall'host" in str(exc_info.value)
+    assert exc_info.value.__cause__ is guasto
 
 
 # Contenuto oltre il cap → l'adattatore lo tronca a MAX_CHARS
