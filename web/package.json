@@ -13,7 +13,7 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
-    "types:gen": "openapi-typescript http://localhost:8000/openapi.json -o src/types/api.ts"
+    "types:gen": "openapi-typescript ../api/openapi.json -o src/types/api.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

@@ -28,6 +28,16 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
+      - name: Il contratto OpenAPI committato e' aggiornato
+        # openapi.json e' generato ma versionato: e' la sorgente da cui il
+        # frontend deriva i propri tipi. Se una PR cambia uno schema senza
+        # riesportarlo, il contratto committato mente e il frontend continua a
+        # compilare contro tipi stantii. Rigenerare e pretendere zero diff e'
+        # l'unico modo di accorgersene qui invece che a runtime.
+        run: |
+          uv run python -m app.export_openapi
+          git diff --exit-code openapi.json
+
       - name: Test con copertura
         # Soglia MPC-CC del Piano di Qualifica.
         run: uv run pytest --cov=app --cov-report=xml --cov-fail-under=70
@@ -66,6 +76,15 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: I tipi TypeScript sono allineati al contratto
+        # Prima del typecheck, non dopo: se src/types/api.ts e' stantio, `tsc -b`
+        # passa comunque — sta verificando il codice contro un contratto che non
+        # esiste piu'. E' esattamente cosi' che un `as` rimosso smette di
+        # proteggere senza che nessuno se ne accorga.
+        run: |
+          pnpm types:gen
+          git diff --exit-code src/types/api.ts
 
       - name: Controllo dei tipi
         # `tsc -b` e non `tsc --noEmit`: web/tsconfig.json e' un file di soli

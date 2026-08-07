@@ -1,0 +1,6 @@
+# I due file generati sono confrontati byte a byte dalla CI (`git diff --exit-code`).
+# Su Windows l'exporter Python scrive openapi.json con CRLF: senza normalizzazione la
+# guardia fallirebbe in base al `core.autocrlf` di chi apre la PR invece che in base a
+# cio' che la PR cambia davvero — un falso rosso che la renderebbe subito ignorabile.
+api/openapi.json     text eol=lf
+web/src/types/api.ts text eol=lf

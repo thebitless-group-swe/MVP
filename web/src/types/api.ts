@@ -4,7 +4,41 @@
  */
 
 export interface paths {
-    "/api/summarize": {
+    "/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health */
+        get: operations["health__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/constants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Constants */
+        get: operations["constants_api_constants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/critique": {
         parameters: {
             query?: never;
             header?: never;
@@ -13,8 +47,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Summarize */
-        post: operations["summarize_api_summarize_post"];
+        /** Critique */
+        post: operations["critique_api_critique_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -55,7 +89,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/translate": {
+    "/api/grammar": {
         parameters: {
             query?: never;
             header?: never;
@@ -64,8 +98,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Translate */
-        post: operations["translate_api_translate_post"];
+        /** Grammar */
+        post: operations["grammar_api_grammar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -89,7 +123,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/grammar": {
+    "/api/summarize": {
         parameters: {
             query?: never;
             header?: never;
@@ -98,15 +132,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Grammar */
-        post: operations["grammar_api_grammar_post"];
+        /** Summarize */
+        post: operations["summarize_api_summarize_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/critique": {
+    "/api/translate": {
         parameters: {
             query?: never;
             header?: never;
@@ -115,42 +149,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Critique */
-        post: operations["critique_api_critique_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/constants": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Constants */
-        get: operations["constants_api_constants_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Health */
-        get: operations["health__get"];
-        put?: never;
-        post?: never;
+        /** Translate */
+        post: operations["translate_api_translate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -178,13 +178,13 @@ export interface components {
         };
         /** CritiqueRequest */
         CritiqueRequest: {
-            /** Text */
-            text: string;
             /**
              * Hat
              * @enum {string}
              */
             hat: "bianco" | "rosso" | "giallo" | "nero" | "verde" | "blu";
+            /** Text */
+            text: string;
         };
         /** ErrorResponse */
         ErrorResponse: {
@@ -193,14 +193,14 @@ export interface components {
         };
         /** GenerateRequest */
         GenerateRequest: {
-            /** Prompt */
-            prompt: string;
             /**
              * Length
              * @default medio
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+            /** Prompt */
+            prompt: string;
         };
         /** GrammarRequest */
         GrammarRequest: {
@@ -210,47 +210,47 @@ export interface components {
         /** LinkRequest */
         LinkRequest: {
             /**
-             * Url
-             * Format: uri
-             */
-            url: string;
-            /**
              * Length
              * @default medio
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
         };
         /** RewriteRequest */
         RewriteRequest: {
-            /** Text */
-            text: string;
             /**
              * Style
              * @enum {string}
              */
             style: "formale" | "informale" | "accademico";
+            /** Text */
+            text: string;
         };
         /** TextRequest */
         TextRequest: {
-            /** Text */
-            text: string;
             /**
              * Length
              * @default medio
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+            /** Text */
+            text: string;
         };
         /** TranslateRequest */
         TranslateRequest: {
-            /** Text */
-            text: string;
             /**
              * Target Language
              * @enum {string}
              */
             target_language: "inglese" | "francese" | "tedesco" | "spagnolo";
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -261,7 +261,49 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    summarize_api_summarize_post: {
+    health__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    constants_api_constants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiConstants"];
+                };
+            };
+        };
+    };
+    critique_api_critique_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -270,7 +312,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TextRequest"];
+                "application/json": components["schemas"]["CritiqueRequest"];
             };
         };
         responses: {
@@ -360,7 +402,7 @@ export interface operations {
             };
         };
     };
-    translate_api_translate_post: {
+    grammar_api_grammar_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -369,7 +411,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TranslateRequest"];
+                "application/json": components["schemas"]["GrammarRequest"];
             };
         };
         responses: {
@@ -426,7 +468,7 @@ export interface operations {
             };
         };
     };
-    grammar_api_grammar_post: {
+    summarize_api_summarize_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -435,7 +477,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GrammarRequest"];
+                "application/json": components["schemas"]["TextRequest"];
             };
         };
         responses: {
@@ -459,7 +501,7 @@ export interface operations {
             };
         };
     };
-    critique_api_critique_post: {
+    translate_api_translate_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -468,7 +510,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CritiqueRequest"];
+                "application/json": components["schemas"]["TranslateRequest"];
             };
         };
         responses: {
@@ -488,48 +530,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    constants_api_constants_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiConstants"];
-                };
-            };
-        };
-    };
-    health__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
                 };
             };
         };
