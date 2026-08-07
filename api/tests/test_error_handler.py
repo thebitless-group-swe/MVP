@@ -180,6 +180,12 @@ class TestValidationExceptionHandler:
                 "Il link indicato non è un indirizzo valido: controlla che inizi "
                 "con http:// o https://.",
             ),
+            (
+                "/api/summarize",
+                {"text": VALID_TEXT, "length": "lunghissimo"},
+                "Il valore indicato per «lunghezza» non è fra quelli "
+                "ammessi: scegline uno fra le opzioni proposte.",
+            ),
         ],
     )
     def test_messaggio_indica_causa_e_azione_correttiva(
@@ -190,6 +196,29 @@ class TestValidationExceptionHandler:
 
         assert response.status_code == 422
         assert response.json()["detail"] == atteso
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            pytest.param({"text": VALID_TEXT, "length": 999}, id="length-intero"),
+            pytest.param({"text": VALID_TEXT, "length": None}, id="length-nullo"),
+            pytest.param({"text": 12345}, id="text-intero"),
+            pytest.param({"text": VALID_TEXT, "length": []}, id="length-lista"),
+        ],
+    )
+    def test_detail_resta_stringa_anche_col_tipo_di_dato_sbagliato(
+        self, client: TestClient, payload: dict
+    ) -> None:
+        """Un tipo sbagliato non deve far ricomparire l'array di oggetti.
+
+        E' il caso che rompeva il frontend: `useAiStream` legge `detail` come
+        `string | null` e lo mette nello store. Un array la' dentro non e' un
+        messaggio piu' brutto, e' un crash in fase di render.
+        """
+        response = client.post("/api/summarize", json=payload)
+
+        assert response.status_code == 422
+        assert isinstance(response.json()["detail"], str)
 
     def test_piu_campi_invalidi_producono_un_unico_messaggio(
         self, client: TestClient
