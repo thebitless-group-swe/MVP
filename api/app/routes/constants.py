@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..llm.prompts import NO_ERRORS_MARKER, NoErrorsMarker
+from ..core.domain.values import NO_ERRORS_MARKER, NoErrorsMarker
 
 router = APIRouter(prefix="/api", tags=["constants"])
 

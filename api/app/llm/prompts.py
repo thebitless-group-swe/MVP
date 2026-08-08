@@ -1,14 +1,8 @@
-from typing import Literal, get_args
+from ..core.domain.values import NO_ERRORS_MARKER, Hat, Language, Length, Style
 
-from ..schemas import Hat, Language, Length, Style
-
-# Manteniamo il nome storico come alias dell'unica fonte di verita' (schemas.Length).
+# Manteniamo il nome storico come alias dell'unica fonte di verita'
+# (core.domain.values.Length).
 SummaryLength = Length
-
-# Sentinella emessa dalla correzione grammaticale quando non trova errori.
-# Il tipo viene esposto in /openapi.json da ApiConstants.
-NoErrorsMarker = Literal["NESSUN_ERRORE_RILEVATO"]
-NO_ERRORS_MARKER: str = get_args(NoErrorsMarker)[0]
 
 LENGTH_INSTRUCTIONS: dict[Length, str] = {
     "breve": "1-2 frasi che catturino solo l'idea centrale del testo.",

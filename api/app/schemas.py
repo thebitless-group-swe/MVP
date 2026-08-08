@@ -1,21 +1,18 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field, HttpUrl
 
-# Alias riusabile per la lunghezza richiesta delle funzioni AI.
-Length = Literal["breve", "medio", "dettagliato"]
+from .core.domain.values import (
+    MIN_PROMPT_LENGTH,
+    MIN_TEXT_LENGTH,
+    Hat,
+    Language,
+    Length,
+    Style,
+)
 
-# Lingue di destinazione della traduzione (UC 53.1).
-Language = Literal["inglese", "francese", "tedesco", "spagnolo"]
-
-# Registri disponibili per la riscrittura (UC 54.1).
-Style = Literal["formale", "informale", "accademico"]
-
-# I sei cappelli per pensare (R-65 -> R-70).
-Hat = Literal["bianco", "rosso", "giallo", "nero", "verde", "blu"]
-
-# Lunghezza minima del testo accettato dalle funzioni AI (R-81).
-MIN_TEXT_LENGTH = 10
+# I vocabolari e le soglie vivono in core/domain/values.py: qui restano solo i
+# DTO, cioe' il confine HTTP. E' il confine il posto giusto per un eventuale
+# adattamento del vocabolario esterno a quello di dominio (vedi la nota in
+# values.py); il dominio non deve conoscere la forma della richiesta.
 
 # Etichette in italiano dei campi dei DTO, usate per comporre i messaggi di
 # errore 422 in linguaggio naturale (R-110-F-Ob). Stanno qui, accanto ai campi
@@ -39,7 +36,7 @@ class TextRequest(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    prompt: str = Field(min_length=3)
+    prompt: str = Field(min_length=MIN_PROMPT_LENGTH)
     length: Length = "medio"
 
 
