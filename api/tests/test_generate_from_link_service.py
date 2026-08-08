@@ -10,6 +10,7 @@ test_tavily_extractor.py.
 
 import pytest
 
+from app.core.domain.values import MAX_TEXT_LENGTH
 from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
 from app.core.services.generate_from_link import (
     MAX_URL_LENGTH,
@@ -17,6 +18,11 @@ from app.core.services.generate_from_link import (
     fetch_and_extract,
     validate_link,
 )
+
+
+class ExtractorProlisso(ContentExtractor):
+    async def extract(self, url: str) -> str:
+        return "x" * (MAX_TEXT_LENGTH * 3)
 
 
 # Extractor che estrae correttamente → fetch_and_extract ritorna il contenuto della porta
@@ -37,6 +43,20 @@ async def test_fetch_and_extract_wraps_extractor_error_in_fetch_error(
 
     assert str(exc_info.value) == "Errore simulato durante l'estrazione"
     assert isinstance(exc_info.value.__cause__, ContentExtractorError)
+
+
+async def test_fetch_and_extract_applies_the_domain_cap_to_any_extractor() -> None:
+    result = await fetch_and_extract("https://example.com", ExtractorProlisso())
+
+    assert len(result) == MAX_TEXT_LENGTH
+
+
+async def test_fetch_and_extract_leaves_short_content_untouched(
+    dummy_content_extractor: ContentExtractor,
+) -> None:
+    result = await fetch_and_extract("https://example.com", dummy_content_extractor)
+
+    assert result == "Contenuto di esempio per il test."
 
 
 # Schema e forma dell'URL sono ora validati da HttpUrl in LinkRequest: la

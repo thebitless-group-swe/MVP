@@ -13,6 +13,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.core.domain.values import MAX_PROMPT_LENGTH, MAX_TEXT_LENGTH
 from app.main import app
 
 
@@ -186,6 +187,18 @@ class TestValidationExceptionHandler:
                 {"text": VALID_TEXT, "length": "lunghissimo"},
                 "Il valore indicato per «lunghezza» non è fra quelli "
                 "ammessi: scegline uno fra le opzioni proposte.",
+            ),
+            (
+                "/api/summarize",
+                {"text": "x" * (MAX_TEXT_LENGTH + 1)},
+                f"Il campo «testo» non può superare {MAX_TEXT_LENGTH} caratteri: "
+                "riduci il testo o elaboralo in più parti.",
+            ),
+            (
+                "/api/generate",
+                {"prompt": "x" * (MAX_PROMPT_LENGTH + 1)},
+                f"Il campo «istruzioni» non può superare {MAX_PROMPT_LENGTH} "
+                "caratteri: riduci il testo o elaboralo in più parti.",
             ),
         ],
     )

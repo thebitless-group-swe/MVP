@@ -170,6 +170,18 @@ export interface components {
          */
         ApiConstants: {
             /**
+             * Max Prompt Length
+             * @default 2000
+             * @constant
+             */
+            max_prompt_length: 2000;
+            /**
+             * Max Text Length
+             * @default 12000
+             * @constant
+             */
+            max_text_length: 12000;
+            /**
              * Min Prompt Length
              * @default 3
              * @constant
