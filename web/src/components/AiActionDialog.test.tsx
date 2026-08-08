@@ -314,16 +314,23 @@ describe('AiActionDialog — critique (cappelli)', () => {
   // L'etichetta e' di interfaccia («Critico»), il valore e' di contratto
   // («nero»): e' la mappatura che #02 corregge, quindi va asserita sul valore
   // esatto e non su expect.any(String), che passava anche con 'black'.
-  it('click cappello → valore di contratto nel body, non nome inglese', async () => {
+  it.each([
+    ['informativo', 'bianco'],
+    ['emotivo', 'rosso'],
+    ['critico', 'nero'],
+    ['ottimista', 'giallo'],
+    ['creativo', 'verde'],
+    ['organizzativo', 'blu'],
+  ])('%s → hat «%s» nel body, non il nome inglese', async (etichetta, valore) => {
     act(() => { useEditorStore.getState().setAiModal('critique') })
     render(<AiActionDialog />)
 
-    await userEvent.click(screen.getByRole('radio', { name: /critico/i }))
+    await userEvent.click(screen.getByRole('radio', { name: new RegExp(etichetta, 'i') }))
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
     expect(mockStart).toHaveBeenCalledWith({
       endpoint: expect.stringContaining('/api/critique'),
-      body: { text: ACTIVE_TEXT, hat: 'nero' },
+      body: { text: ACTIVE_TEXT, hat: valore },
     })
   })
 

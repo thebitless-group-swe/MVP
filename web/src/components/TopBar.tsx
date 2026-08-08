@@ -1,4 +1,5 @@
 import {
+  Brain,
   Languages,
   Sparkles,
   Wand2,
@@ -83,11 +84,9 @@ export function TopBar({ noteTitle }: TopBarProps) {
           <SpellCheck aria-hidden="true" /> Grammatica
         </Button>
 
-        {/* Analisi fuori scope */}
-        <Button type="button" variant="outline" size="sm" disabled aria-disabled="true"
-          title="Analisi (non disponibile)">
-          <span aria-hidden="true" className="grayscale brightness-0 opacity-100">🧢</span>
-          Analisi
+        <Button type="button" size="sm" variant="secondary"
+          onClick={() => openModal('critique')} disabled={isGenerating} aria-label="Analisi">
+          <Brain aria-hidden="true" /> Analisi
         </Button>
 
 
