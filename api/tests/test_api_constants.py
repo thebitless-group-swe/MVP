@@ -1,11 +1,19 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.domain.values import MIN_PROMPT_LENGTH, MIN_TEXT_LENGTH, NO_ERRORS_MARKER
+from app.core.domain.values import (
+    MAX_PROMPT_LENGTH,
+    MAX_TEXT_LENGTH,
+    MIN_PROMPT_LENGTH,
+    MIN_TEXT_LENGTH,
+    NO_ERRORS_MARKER,
+)
 
 SOGLIE = [
     ("min_text_length", MIN_TEXT_LENGTH),
     ("min_prompt_length", MIN_PROMPT_LENGTH),
+    ("max_text_length", MAX_TEXT_LENGTH),
+    ("max_prompt_length", MAX_PROMPT_LENGTH),
 ]
 
 
@@ -34,6 +42,8 @@ class TestFormaDellEndpoint:
             "no_errors_marker": NO_ERRORS_MARKER,
             "min_text_length": MIN_TEXT_LENGTH,
             "min_prompt_length": MIN_PROMPT_LENGTH,
+            "max_text_length": MAX_TEXT_LENGTH,
+            "max_prompt_length": MAX_PROMPT_LENGTH,
         }
 
 
@@ -53,5 +63,32 @@ class TestCoerenzaConIDto:
         soglia = client.get("/api/constants").json()["min_prompt_length"]
 
         response = client.post("/api/generate", json={"prompt": "x" * (soglia - 1)})
+
+        assert response.status_code == 422
+
+    def test_il_testo_oltre_il_massimo_pubblicato_e_rifiutato(
+        self, client: TestClient
+    ) -> None:
+        massimo = client.get("/api/constants").json()["max_text_length"]
+
+        response = client.post("/api/summarize", json={"text": "x" * (massimo + 1)})
+
+        assert response.status_code == 422
+
+    def test_il_testo_esattamente_al_massimo_e_accettato(
+        self, client: TestClient
+    ) -> None:
+        massimo = client.get("/api/constants").json()["max_text_length"]
+
+        response = client.post("/api/summarize", json={"text": "x" * massimo})
+
+        assert response.status_code != 422
+
+    def test_le_istruzioni_oltre_il_massimo_pubblicato_sono_rifiutate(
+        self, client: TestClient
+    ) -> None:
+        massimo = client.get("/api/constants").json()["max_prompt_length"]
+
+        response = client.post("/api/generate", json={"prompt": "x" * (massimo + 1)})
 
         assert response.status_code == 422

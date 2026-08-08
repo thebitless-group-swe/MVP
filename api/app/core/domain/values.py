@@ -35,6 +35,12 @@ MIN_TEXT_LENGTH: MinTextLength = 10
 MinPromptLength = Literal[3]
 MIN_PROMPT_LENGTH: MinPromptLength = 3
 
+MaxTextLength = Literal[12000]
+MAX_TEXT_LENGTH: MaxTextLength = 12000
+
+MaxPromptLength = Literal[2000]
+MAX_PROMPT_LENGTH: MaxPromptLength = 2000
+
 # Sentinella emessa dalla correzione grammaticale quando non trova errori.
 # Il tipo viene esposto in /openapi.json da ApiConstants (routes/constants.py);
 # l'annotazione sul valore lega le due dichiarazioni, cosi' cambiare la stringa

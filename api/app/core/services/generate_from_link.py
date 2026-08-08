@@ -6,6 +6,7 @@ gia' cosi' quando stava in `llm/fetch_url.py` — era l'unico modulo del backend
 a rispettare pienamente l'inversione delle dipendenze — ma il package lo teneva
 fra dominio e infrastruttura, dove nessuno lo avrebbe cercato.
 """
+from ..domain.values import MAX_TEXT_LENGTH
 from ..ports.content_extractor import ContentExtractor, ContentExtractorError
 
 MAX_URL_LENGTH = 2_048
@@ -20,6 +21,8 @@ def validate_link(url: str) -> None:
 
 async def fetch_and_extract(url: str, extractor: ContentExtractor) -> str:
     try:
-        return await extractor.extract(url)
+        contenuto = await extractor.extract(url)
     except ContentExtractorError as exc:
         raise FetchError(str(exc)) from exc
+
+    return contenuto[:MAX_TEXT_LENGTH]
