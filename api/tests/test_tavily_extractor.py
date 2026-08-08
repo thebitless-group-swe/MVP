@@ -150,7 +150,8 @@ async def test_un_errore_del_client_diventa_un_errore_di_porta() -> None:
     Il `from exc` conta quanto la traduzione. La rotta registra lo stacktrace e
     mostra all'utente un messaggio pulito (R-110-F-Ob): senza la causa
     concatenata, lato server resterebbe soltanto il messaggio riscritto e la
-    diagnosi ripartirebbe da zero. Stesso idioma di test_fetch_url.py.
+    diagnosi ripartirebbe da zero. Stesso idioma di
+    test_generate_from_link_service.py.
 
     Il test prova anche che l'eccezione sopravvive al salto di thread di
     `asyncio.to_thread`, che e' cio' che la #05 ha introdotto sotto a questa riga.

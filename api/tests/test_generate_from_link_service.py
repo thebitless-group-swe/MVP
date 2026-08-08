@@ -11,7 +11,12 @@ test_tavily_extractor.py.
 import pytest
 
 from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
-from app.llm.fetch_url import MAX_URL_LENGTH, FetchError, fetch_and_extract, validate_link
+from app.core.services.generate_from_link import (
+    MAX_URL_LENGTH,
+    FetchError,
+    fetch_and_extract,
+    validate_link,
+)
 
 
 # Extractor che estrae correttamente → fetch_and_extract ritorna il contenuto della porta

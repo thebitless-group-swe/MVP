@@ -5,9 +5,13 @@ from fastapi.responses import StreamingResponse
 
 from ..core.ports.content_extractor import ContentExtractor
 from ..core.ports.llm_client import LLMClient
+from ..core.services.generate_from_link import (
+    FetchError,
+    fetch_and_extract,
+    validate_link,
+)
 from ..infrastructure.adapters.sse_streaming import sse_response
 from ..llm import get_content_extractor, get_llm_client
-from ..llm.fetch_url import FetchError, fetch_and_extract, validate_link
 from ..llm.prompts import build_generate_messages
 from ..schemas import LinkRequest
 
