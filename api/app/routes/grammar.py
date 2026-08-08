@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from ..core.ports.llm_client import LLMClient
+from ..infrastructure.adapters.sse_streaming import sse_response
 from ..llm import get_llm_client
 from ..llm.prompts import build_grammar_messages
-from ..llm.streaming import sse_response
 from ..schemas import GrammarRequest
 
 router = APIRouter(prefix="/api", tags=["grammar"])
