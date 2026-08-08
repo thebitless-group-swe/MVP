@@ -6,9 +6,9 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.core.ports.llm_client import LLMClient, LLMProviderError
 from app.llm import get_llm_client
-from app.llm.client import LiteLLMClient, LLMClient
-from app.llm.errors import LLMProviderError
+from app.llm.client import LiteLLMClient
 from app.llm.streaming import (
     SERVICE_UNAVAILABLE_DETAIL,
     SSE_ERROR_EVENT,

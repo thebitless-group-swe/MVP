@@ -3,9 +3,10 @@ from functools import lru_cache
 from fastapi import HTTPException
 
 from ..core.ports.content_extractor import ContentExtractor
+from ..core.ports.llm_client import LLMClient
 from ..infrastructure.adapters.tavily_extractor import TavilyExtractor
 from ..settings import get_settings
-from .client import LiteLLMClient, LLMClient
+from .client import LiteLLMClient
 
 _CHIAVE_MANCANTE_DETAIL = (
     "Servizio di estrazione contenuti temporaneamente non disponibile "

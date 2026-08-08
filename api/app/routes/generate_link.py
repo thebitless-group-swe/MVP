@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from ..core.ports.content_extractor import ContentExtractor
+from ..core.ports.llm_client import LLMClient
 from ..llm import get_content_extractor, get_llm_client
-from ..llm.client import LLMClient
 from ..llm.fetch_url import FetchError, fetch_and_extract, validate_link
 from ..llm.prompts import build_generate_messages
 from ..llm.streaming import sse_response

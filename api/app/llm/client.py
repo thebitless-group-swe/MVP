@@ -1,22 +1,14 @@
 import json
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
 import httpx
 
+from ..core.ports.llm_client import LLMClient, LLMProviderError
 from ..settings import Settings
-from .errors import LLMProviderError
 
 HTTP_TIMEOUT_SECONDS = 60.0
 SSE_DATA_PREFIX = "data:"
 SSE_DONE_MARKER = "[DONE]"
-
-
-class LLMClient(ABC):
-    @abstractmethod
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
-        """Yield chunk testuali (delta.content) dal provider LLM."""
-        ...
 
 
 class LiteLLMClient(LLMClient):
