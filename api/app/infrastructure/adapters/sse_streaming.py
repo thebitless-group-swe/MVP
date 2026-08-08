@@ -1,10 +1,18 @@
+"""Adattatore di trasporto: da stream di chunk LLM a risposta SSE HTTP.
+
+Sta sotto `infrastructure/adapters/` perche' e' il modulo che conosce HTTP —
+`StreamingResponse`, `HTTPException`, `Request.is_disconnected()` — e il formato
+degli eventi SSE. Finche' viveva in `llm/streaming.py`, quel package importava
+FastAPI accanto ai prompt, cioe' teneva il trasporto e il dominio sotto lo
+stesso nome.
+"""
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator
 
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from ..core.ports.llm_client import LLMProviderError
+from ...core.ports.llm_client import LLMProviderError
 
 #Messaggio vincolato da UC 62: non modificare, tradurre o abbreviare.
 SERVICE_UNAVAILABLE_DETAIL = "Servizio temporaneamente non disponibile"
