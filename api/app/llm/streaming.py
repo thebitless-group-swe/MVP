@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from .errors import LLMProviderError
+from ..core.ports.llm_client import LLMProviderError
 
 #Messaggio vincolato da UC 62: non modificare, tradurre o abbreviare.
 SERVICE_UNAVAILABLE_DETAIL = "Servizio temporaneamente non disponibile"

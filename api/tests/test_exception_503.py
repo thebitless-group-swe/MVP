@@ -14,9 +14,8 @@ from collections.abc import AsyncIterator
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.ports.llm_client import LLMClient, LLMProviderError
 from app.llm import get_llm_client
-from app.llm.client import LLMClient
-from app.llm.errors import LLMProviderError
 from app.main import app
 from app.settings import get_settings
 

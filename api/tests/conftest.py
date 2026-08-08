@@ -5,8 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
+from app.core.ports.llm_client import LLMClient
 from app.llm import get_content_extractor
-from app.llm.client import LLMClient
 from app.main import app
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

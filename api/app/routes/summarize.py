@@ -3,8 +3,8 @@ import logging
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
+from ..core.ports.llm_client import LLMClient
 from ..llm import get_llm_client
-from ..llm.client import LLMClient
 from ..llm.prompts import build_summarize_messages
 from ..llm.streaming import sse_response
 from ..schemas import TextRequest

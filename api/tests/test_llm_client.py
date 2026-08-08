@@ -11,8 +11,8 @@ from collections.abc import Callable
 import httpx
 import pytest
 
+from app.core.ports.llm_client import LLMProviderError
 from app.llm.client import HTTP_TIMEOUT_SECONDS, LiteLLMClient
-from app.llm.errors import LLMProviderError
 from app.settings import Settings
 
 MESSAGES = [{"role": "user", "content": "Riassumi questo testo."}]

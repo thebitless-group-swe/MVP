@@ -4,9 +4,8 @@ from collections.abc import AsyncIterator, Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.ports.llm_client import LLMClient, LLMProviderError
 from app.llm import get_llm_client
-from app.llm.client import LLMClient
-from app.llm.errors import LLMProviderError
 from app.llm.prompts import NO_ERRORS_MARKER
 from app.llm.streaming import SERVICE_UNAVAILABLE_DETAIL
 from app.main import app
