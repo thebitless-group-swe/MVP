@@ -170,6 +170,18 @@ export interface components {
          */
         ApiConstants: {
             /**
+             * Min Prompt Length
+             * @default 3
+             * @constant
+             */
+            min_prompt_length: 3;
+            /**
+             * Min Text Length
+             * @default 10
+             * @constant
+             */
+            min_text_length: 10;
+            /**
              * No Errors Marker
              * @default NESSUN_ERRORE_RILEVATO
              * @constant

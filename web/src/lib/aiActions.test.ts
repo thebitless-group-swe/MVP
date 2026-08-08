@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { AI_ACTIONS, type AiParams } from '@/lib/aiActions'
+import { MIN_PROMPT_LENGTH, MIN_TEXT_LENGTH } from '@/types/models'
 import type { AiActionId } from '@/store/useEditorStore'
 
 const ALL_ACTION_IDS: AiActionId[] = [
@@ -72,4 +73,24 @@ describe('AI_ACTIONS — proprietà obbligatorie', () => {
       expect(action.minLength).toBeGreaterThan(0)
     },
   )
+})
+
+describe('AI_ACTIONS — minLength deriva dal contratto', () => {
+  it.each([
+    ['summarize', MIN_TEXT_LENGTH],
+    ['translate', MIN_TEXT_LENGTH],
+    ['rewrite', MIN_TEXT_LENGTH],
+    ['grammar', MIN_TEXT_LENGTH],
+    ['critique', MIN_TEXT_LENGTH],
+    ['generate', MIN_PROMPT_LENGTH],
+  ] as [AiActionId, number][])(
+    '%s: minLength è la soglia del contratto',
+    (id, atteso) => {
+      expect(AI_ACTIONS[id].minLength).toBe(atteso)
+    },
+  )
+
+  it('generate-link: resta un controllo di UI senza corrispettivo nel contratto', () => {
+    expect(AI_ACTIONS['generate-link'].minLength).toBe(1)
+  })
 })
