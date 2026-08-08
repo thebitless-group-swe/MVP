@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field, HttpUrl
 
 from .core.domain.values import (
+    MAX_PROMPT_LENGTH,
+    MAX_TEXT_LENGTH,
     MIN_PROMPT_LENGTH,
     MIN_TEXT_LENGTH,
     Hat,
@@ -31,12 +33,12 @@ FIELD_LABELS: dict[str, str] = {
 
 
 class TextRequest(BaseModel):
-    text: str = Field(min_length=MIN_TEXT_LENGTH)
+    text: str = Field(min_length=MIN_TEXT_LENGTH, max_length=MAX_TEXT_LENGTH)
     length: Length = "medio"
 
 
 class GenerateRequest(BaseModel):
-    prompt: str = Field(min_length=MIN_PROMPT_LENGTH)
+    prompt: str = Field(min_length=MIN_PROMPT_LENGTH, max_length=MAX_PROMPT_LENGTH)
     length: Length = "medio"
 
 
@@ -47,22 +49,22 @@ class LinkRequest(BaseModel):
 
 
 class TranslateRequest(BaseModel):
-    text: str = Field(min_length=MIN_TEXT_LENGTH)
+    text: str = Field(min_length=MIN_TEXT_LENGTH, max_length=MAX_TEXT_LENGTH)
     #Nessun default: lingua, stile e cappello vanno scelti esplicitamente
     target_language: Language
 
 
 class RewriteRequest(BaseModel):
-    text: str = Field(min_length=MIN_TEXT_LENGTH)
+    text: str = Field(min_length=MIN_TEXT_LENGTH, max_length=MAX_TEXT_LENGTH)
     style: Style
 
 
 class GrammarRequest(BaseModel):
-    text: str = Field(min_length=MIN_TEXT_LENGTH)
+    text: str = Field(min_length=MIN_TEXT_LENGTH, max_length=MAX_TEXT_LENGTH)
 
 
 class CritiqueRequest(BaseModel):
-    text: str = Field(min_length=MIN_TEXT_LENGTH)
+    text: str = Field(min_length=MIN_TEXT_LENGTH, max_length=MAX_TEXT_LENGTH)
     hat: Hat
 
 

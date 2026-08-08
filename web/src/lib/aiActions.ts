@@ -12,6 +12,12 @@ import type {
   Style,
   Hat,
 } from '@/types/models'
+import {
+  MAX_PROMPT_LENGTH,
+  MAX_TEXT_LENGTH,
+  MIN_PROMPT_LENGTH,
+  MIN_TEXT_LENGTH,
+} from '@/types/models'
 
 export type { AiActionId }
 
@@ -65,6 +71,7 @@ export type AiActionDef = {
   buildBody: (params: AiParams, input: string) => AiRequestBody
   insertMode: 'replace' | 'append'
   minLength: number
+  maxLength: number | null
 }
 
 export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
@@ -77,7 +84,8 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
       length: params.length ?? 'medio',
     }),
     insertMode: 'replace',
-    minLength: 10,
+    minLength: MIN_TEXT_LENGTH,
+    maxLength: MAX_TEXT_LENGTH,
   },
   translate: {
     label: 'Traduci',
@@ -88,7 +96,8 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
       target_language: required(params.target_language, 'target_language'),
     }),
     insertMode: 'replace',
-    minLength: 10,
+    minLength: MIN_TEXT_LENGTH,
+    maxLength: MAX_TEXT_LENGTH,
   },
   rewrite: {
     label: 'Riscrivi',
@@ -99,7 +108,8 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
       style: required(params.style, 'style'),
     }),
     insertMode: 'replace',
-    minLength: 10,
+    minLength: MIN_TEXT_LENGTH,
+    maxLength: MAX_TEXT_LENGTH,
   },
   grammar: {
     label: 'Grammatica',
@@ -107,7 +117,8 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
     source: 'text',
     buildBody: (_, text): GrammarRequest => ({ text }),
     insertMode: 'replace',
-    minLength: 10,
+    minLength: MIN_TEXT_LENGTH,
+    maxLength: MAX_TEXT_LENGTH,
   },
   critique: {
     label: 'Analisi',
@@ -118,7 +129,8 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
       hat: required(params.hat, 'hat'),
     }),
     insertMode: 'append',
-    minLength: 10,
+    minLength: MIN_TEXT_LENGTH,
+    maxLength: MAX_TEXT_LENGTH,
   },
   generate: {
     label: 'Genera',
@@ -129,7 +141,8 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
       length: params.length ?? 'medio',
     }),
     insertMode: 'append',
-    minLength: 3,
+    minLength: MIN_PROMPT_LENGTH,
+    maxLength: MAX_PROMPT_LENGTH,
   },
   'generate-link': {
     label: 'Genera da link',
@@ -141,6 +154,7 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
     }),
     insertMode: 'append',
     minLength: 1,
+    maxLength: null,
   },
 }
 
