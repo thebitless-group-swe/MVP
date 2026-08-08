@@ -242,6 +242,8 @@ export function AiActionDialog() {
     JSON.stringify(lastCall.params) === JSON.stringify(params)
 
   const inputTooShort = currentInput.length < action.minLength
+  const inputTooLong =
+    action.maxLength !== null && currentInput.length > action.maxLength
 
 
   const handleGenerate = () => {
@@ -249,6 +251,13 @@ export function AiActionDialog() {
     if (inputTooShort) {
       setValidationError(
         `Servono almeno ${action.minLength} caratteri di testo.`,
+      )
+      return
+    }
+    if (inputTooLong) {
+      setValidationError(
+        `Il testo supera il massimo di ${action.maxLength} caratteri ` +
+          `(attuali: ${currentInput.length}). Riducilo o elaboralo in più parti.`,
       )
       return
     }
