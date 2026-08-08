@@ -3,8 +3,8 @@ from collections.abc import AsyncIterator
 
 import httpx
 
-from ..core.ports.llm_client import LLMClient, LLMProviderError
-from ..settings import Settings
+from ...core.ports.llm_client import LLMClient, LLMProviderError
+from ...settings import Settings
 
 HTTP_TIMEOUT_SECONDS = 60.0
 SSE_DATA_PREFIX = "data:"
@@ -12,9 +12,25 @@ SSE_DONE_MARKER = "[DONE]"
 
 
 class LiteLLMClient(LLMClient):
-    """Client SSE per un gateway LiteLLM (API compatibile OpenAI)."""
+    """Client SSE per un gateway LiteLLM (API compatibile OpenAI).
+
+    Sta accanto a `TavilyExtractor` perche' ha lo stesso ruolo: implementare una
+    porta di `core/ports/` parlando con un servizio esterno. Finche' viveva in
+    `llm/client.py`, quel package teneva sotto lo stesso nome il dominio
+    (`prompts.py`) e l'unico modulo del backend che conosce httpx e il formato
+    SSE del provider.
+
+    Le tre costanti si spostano con la classe: descrivono il protocollo del
+    provider, non una regola di dominio. `HTTP_TIMEOUT_SECONDS` resta pubblica
+    perche' i test la usano per verificare la configurazione del trasporto.
+    """
 
     def __init__(self, settings: Settings) -> None:
+        #La configurazione arriva da chi costruisce l'adattatore: leggerla qui
+        #da `get_settings()` legherebbe una classe di infrastruttura al
+        #singleton globale e renderebbe impossibile istanziarla nei test senza
+        #toccare l'ambiente. Stessa scelta di `TavilyExtractor`; il composition
+        #root (`llm/__init__.py`) e' l'unico a sapere da dove arriva.
         self._settings = settings
         self._client = httpx.AsyncClient(
             base_url=settings.litellm_base_url,

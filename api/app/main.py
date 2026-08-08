@@ -6,8 +6,8 @@ from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .infrastructure.adapters.litellm_client import LiteLLMClient
 from .llm import close_content_extractor, get_llm_client
-from .llm.client import LiteLLMClient
 from .routes import (
     constants_router,
     critique_router,
