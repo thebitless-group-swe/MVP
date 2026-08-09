@@ -22,6 +22,8 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+from app.core.domain.prompts.rules import LENGTH_INSTRUCTIONS
+from app.core.domain.prompts.templates import build_generate_from_link_messages
 from app.core.domain.values import MAX_TEXT_LENGTH, Length
 from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
 from app.core.services.generate_from_link import (
@@ -32,7 +34,6 @@ from app.core.services.generate_from_link import (
     generate_from_link,
     validate_link,
 )
-from app.llm.prompts import LENGTH_INSTRUCTIONS, build_generate_from_link_messages
 from tests.conftest import DummyContentExtractor, DummyLLMClient
 
 CONTENUTO_ESTRATTO = "Contenuto di esempio per il test."

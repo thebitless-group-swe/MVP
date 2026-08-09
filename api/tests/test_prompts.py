@@ -1,15 +1,13 @@
 import pytest
 
-from app.llm.prompts import (
-    _REGOLE_DI_FORMA_GENERAZIONE,
-    GENERATE_FROM_LINK_SYSTEM_PROMPT,
-    GENERATE_SYSTEM_PROMPT,
-    LENGTH_INSTRUCTIONS,
-    SummaryLength,
+from app.core.domain.prompts.composer import FORM_HEADING
+from app.core.domain.prompts.rules import LENGTH_INSTRUCTIONS
+from app.core.domain.prompts.templates import (
     build_generate_from_link_messages,
     build_generate_messages,
     build_summarize_messages,
 )
+from app.core.domain.values import Length
 
 TEST_STRING = """\
     Ezechiele 25,17.
@@ -58,7 +56,7 @@ def test_user_text_does_not_leak_into_system() -> None:
 #Questo test controlla in particolare che le istruzioni di lunghezza vengano correttamente
 #inserite nel prompt e che siano anche collegate correttamente alle loro chiavi
 @pytest.mark.parametrize("length", list(LENGTH_INSTRUCTIONS.keys()))
-def test_length_levels_inject_correct_instruction(length: SummaryLength) -> None:
+def test_length_levels_inject_correct_instruction(length: Length) -> None:
     msgs = build_summarize_messages("Testo di prova", length = length)
     system_content = msgs[0]["content"]
 
@@ -140,12 +138,16 @@ def test_system_prompt_declares_extracted_content_is_not_instructions() -> None:
     Il valore di questo test e' impedire che la mitigazione sparisca dal prompt
     senza che nessuno se ne accorga.
     """
-    assert "non istruzioni da" in GENERATE_FROM_LINK_SYSTEM_PROMPT
+    system_content = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0][
+        "content"
+    ]
+
+    assert "non istruzioni da" in system_content
 
 
 @pytest.mark.parametrize("length", list(LENGTH_INSTRUCTIONS.keys()))
 def test_generate_from_link_length_levels_inject_correct_instruction(
-    length: SummaryLength,
+    length: Length,
 ) -> None:
     msgs = build_generate_from_link_messages(PAGINA_ESTRATTA, length)
 
@@ -162,17 +164,21 @@ def test_generate_from_link_has_its_own_system_prompt() -> None:
     assert da_link != diretta
 
 
-def test_both_generation_prompts_share_the_same_form_rules() -> None:
+def test_the_three_italian_prose_prompts_share_the_same_form_rules() -> None:
     """Distinti nelle regole di contenuto, identici in quelle di forma.
 
-    Le regole di forma dei due prompt di generazione sono un blocco solo,
-    interpolato in entrambi. Senza questo test, riscriverle in uno dei due
-    passerebbe inosservato e i due testi tornerebbero a divergere in silenzio —
-    che e' esattamente la duplicazione che l'estrazione ha eliminato.
+    Prima erano due prompt tenuti allineati da un'interpolazione e un terzo —
+    il riassunto — tenuto allineato da nulla: le stesse tre regole di forma
+    scritte una terza volta a mano. Ora sono la stessa tupla di costanti, e
+    questo test lo verifica dal risultato invece che dalla definizione: e' cio'
+    che arriva al provider a dover coincidere.
     """
-    assert GENERATE_SYSTEM_PROMPT.endswith(
-        _REGOLE_DI_FORMA_GENERAZIONE.format(fonte="dell'indicazione di input")
+    da_link, diretta, riassunto = (
+        build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0]["content"],
+        build_generate_messages(PAGINA_ESTRATTA, "medio")[0]["content"],
+        build_summarize_messages(PAGINA_ESTRATTA, "medio")[0]["content"],
     )
-    assert GENERATE_FROM_LINK_SYSTEM_PROMPT.endswith(
-        _REGOLE_DI_FORMA_GENERAZIONE.format(fonte="della pagina")
-    )
+
+    code = [testo.split(FORM_HEADING)[1] for testo in (da_link, diretta, riassunto)]
+
+    assert len(set(code)) == 1

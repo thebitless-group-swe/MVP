@@ -3,16 +3,16 @@ from typing import get_args
 
 import pytest
 
-from app.llm.prompts import (
-    CRITIQUE_SYSTEM_PROMPTS,
-    GRAMMAR_SYSTEM_PROMPT,
-    NO_ERRORS_MARKER,
-    STYLE_INSTRUCTIONS,
+from app.core.domain.prompts.rules import STYLE_INSTRUCTIONS
+from app.core.domain.prompts.templates import (
+    CRITIQUE_FOCUS,
+    CRITIQUE_PERSPECTIVES,
     build_critique_messages,
     build_grammar_messages,
     build_rewrite_messages,
     build_translate_messages,
 )
+from app.core.domain.values import NO_ERRORS_MARKER
 from app.schemas import Hat, Language, Style
 
 TEST_TEXT = "Un testo abbastanza lungo da superare la validazione di schema."
@@ -68,8 +68,9 @@ class TestGrammarMessages:
         _assert_system_then_user(msgs, TEST_TEXT)
 
     def test_prompt_declares_the_no_errors_sentinel(self) -> None:
+        #Il prompt non e' piu' una costante di modulo ma il risultato della
+        #composizione: la sentinella si cerca dove arriva al provider.
         assert NO_ERRORS_MARKER == "NESSUN_ERRORE_RILEVATO"
-        assert NO_ERRORS_MARKER in GRAMMAR_SYSTEM_PROMPT
         assert NO_ERRORS_MARKER in build_grammar_messages(TEST_TEXT)[0]["content"]
 
 
@@ -91,10 +92,15 @@ class TestCritiqueMessages:
 
     @pytest.mark.parametrize("hat", list(get_args(Hat)))
     def test_each_hat_names_its_own_perspective(self, hat: Hat) -> None:
-        system_content = CRITIQUE_SYSTEM_PROMPTS[hat].lower()
+        system_content = build_critique_messages(TEST_TEXT, hat)[0]["content"].lower()
 
         for keyword in HAT_KEYWORDS[hat]:
             assert keyword in system_content, f"cappello {hat}: manca '{keyword}'"
 
     def test_registry_covers_exactly_the_six_hats(self) -> None:
-        assert set(CRITIQUE_SYSTEM_PROMPTS.keys()) == set(get_args(Hat))
+        #Due registri invece di uno: il fuoco della prospettiva entra nella
+        #frase di ruolo, le tre consegne nella sezione dedicata. Devono coprire
+        #gli stessi sei cappelli, altrimenti un colore avrebbe il ruolo di uno
+        #e le consegne di nessuno.
+        assert set(CRITIQUE_FOCUS.keys()) == set(get_args(Hat))
+        assert set(CRITIQUE_PERSPECTIVES.keys()) == set(get_args(Hat))

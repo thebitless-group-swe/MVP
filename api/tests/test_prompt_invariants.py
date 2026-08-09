@@ -32,8 +32,7 @@ from typing import get_args
 
 import pytest
 
-from app.core.domain.values import NO_ERRORS_MARKER, Hat, Language, Length, Style
-from app.llm.prompts import (
+from app.core.domain.prompts.templates import (
     build_critique_messages,
     build_generate_from_link_messages,
     build_generate_messages,
@@ -42,6 +41,7 @@ from app.llm.prompts import (
     build_summarize_messages,
     build_translate_messages,
 )
+from app.core.domain.values import NO_ERRORS_MARKER, Hat, Language, Length, Style
 
 TESTO = "Un testo di prova abbastanza lungo da superare la validazione di schema."
 

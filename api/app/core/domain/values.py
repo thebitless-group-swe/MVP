@@ -1,10 +1,10 @@
 """Value object del dominio: i tipi e le costanti che le funzioni AI condividono.
 
 Stanno sotto `core/` perche' il dominio non deve dipendere dal trasporto. Prima
-di questa issue `llm/prompts.py` importava da `schemas.py`: i prompt, che sono
-dominio, dipendevano dai DTO HTTP e quindi da Pydantic e da FastAPI. La freccia
-puntava dal centro verso il bordo. Qui si inverte: `schemas.py` e
-`llm/prompts.py` importano entrambi da questo modulo, che a sua volta non
+della #40 i prompt — che sono dominio — importavano da `schemas.py`, e quindi
+dipendevano dai DTO HTTP, da Pydantic e da FastAPI: la freccia puntava dal
+centro verso il bordo. Qui si inverte. Oggi `schemas.py` e
+`core/domain/prompts/` importano entrambi da questo modulo, che a sua volta non
 importa nulla oltre a `typing`.
 
 Nota: DTO e value object condividono lo stesso Literal per limitare il

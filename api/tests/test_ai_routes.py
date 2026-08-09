@@ -4,10 +4,10 @@ from collections.abc import AsyncIterator, Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.domain.values import NO_ERRORS_MARKER
 from app.core.ports.llm_client import LLMClient, LLMProviderError
 from app.dependencies import get_llm_client
 from app.infrastructure.adapters.sse_streaming import SERVICE_UNAVAILABLE_DETAIL
-from app.llm.prompts import NO_ERRORS_MARKER
 from app.main import app
 from tests.conftest import DummyLLMClient
 

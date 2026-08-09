@@ -14,10 +14,9 @@ c'e' niente da comporre: la rotta si fa iniettare la porta e la passa alla
 funzione. Un `get_summarize_service` sarebbe un livello di indirezione che non
 inietta nulla che la rotta non abbia gia'.
 
-Cosa resta fuori, di proposito: `app/llm/prompts.py`. I prompt sono dominio e
-vanno promossi dentro `core/`, ma e' un trasloco che tocca tutti e sette i
-servizi e va fatto — e rivisto — per conto suo. Dopo la #18 `app/llm/` contiene
-quel solo modulo e nessuno importa piu' `app.llm`: solo `app.llm.prompts`.
+Il trasloco si e' completato con la promozione dei prompt in
+`core/domain/prompts/`: `app/llm/` conteneva ormai il solo `prompts.py` e non
+esiste piu'. Nessun package del backend prende ancora nome da una tecnologia.
 """
 from functools import lru_cache
 
