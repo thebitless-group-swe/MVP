@@ -4,6 +4,30 @@
       "ApiConstants": {
         "description": "Costanti del contratto lette dal frontend tramite openapi-typescript.\n\nIl campo e' tipizzato come letterale, quindi in /openapi.json compare come\n`const`.",
         "properties": {
+          "max_prompt_length": {
+            "const": 2000,
+            "default": 2000,
+            "title": "Max Prompt Length",
+            "type": "integer"
+          },
+          "max_text_length": {
+            "const": 12000,
+            "default": 12000,
+            "title": "Max Text Length",
+            "type": "integer"
+          },
+          "min_prompt_length": {
+            "const": 3,
+            "default": 3,
+            "title": "Min Prompt Length",
+            "type": "integer"
+          },
+          "min_text_length": {
+            "const": 10,
+            "default": 10,
+            "title": "Min Text Length",
+            "type": "integer"
+          },
           "no_errors_marker": {
             "const": "NESSUN_ERRORE_RILEVATO",
             "default": "NESSUN_ERRORE_RILEVATO",
@@ -29,6 +53,7 @@
             "type": "string"
           },
           "text": {
+            "maxLength": 12000,
             "minLength": 10,
             "title": "Text",
             "type": "string"
@@ -67,6 +92,7 @@
             "type": "string"
           },
           "prompt": {
+            "maxLength": 2000,
             "minLength": 3,
             "title": "Prompt",
             "type": "string"
@@ -81,6 +107,7 @@
       "GrammarRequest": {
         "properties": {
           "text": {
+            "maxLength": 12000,
             "minLength": 10,
             "title": "Text",
             "type": "string"
@@ -130,6 +157,7 @@
             "type": "string"
           },
           "text": {
+            "maxLength": 12000,
             "minLength": 10,
             "title": "Text",
             "type": "string"
@@ -155,6 +183,7 @@
             "type": "string"
           },
           "text": {
+            "maxLength": 12000,
             "minLength": 10,
             "title": "Text",
             "type": "string"
@@ -179,6 +208,7 @@
             "type": "string"
           },
           "text": {
+            "maxLength": 12000,
             "minLength": 10,
             "title": "Text",
             "type": "string"

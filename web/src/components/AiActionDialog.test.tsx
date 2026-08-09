@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiActionDialog } from '@/components/AiActionDialog'
 import { api } from '@/lib/api'
 import { useEditorStore } from '@/store/useEditorStore'
-import { NO_ERRORS_MARKER } from '@/types/models'
+import {
+  MAX_PROMPT_LENGTH,
+  MAX_TEXT_LENGTH,
+  NO_ERRORS_MARKER,
+} from '@/types/models'
 import { AI_ACTIONS } from '@/lib/aiActions'
 
 // Hoisted: i mock devono essere pronti prima che vi.mock li usi
@@ -198,16 +202,20 @@ describe('AiActionDialog — Rifiuta', () => {
 })
 
 describe('AiActionDialog — testo insufficiente (R-81)', () => {
-  it('generate: nessuna fetch con prompt troppo corto, mostra alert', async () => {
+  it('generate: il prompt oltre il massimo non parte', async () => {
     act(() => { useEditorStore.getState().setAiModal('generate') })
     render(<AiActionDialog />)
 
-    await userEvent.type(screen.getByRole('textbox'), 'ab')
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'x'.repeat(MAX_PROMPT_LENGTH + 1) },
+    })
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
     expect(mockStart).not.toHaveBeenCalled()
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        `massimo di ${MAX_PROMPT_LENGTH} caratteri`
+      )
     })
   })
 
@@ -225,6 +233,51 @@ describe('AiActionDialog — testo insufficiente (R-81)', () => {
     })
   })
 })
+
+  it('summarize: nessuna fetch, e l alert dice quanto e il massimo', async () => {
+    vi.mocked(getActiveText).mockReturnValue('x'.repeat(MAX_TEXT_LENGTH + 1))
+
+    act(() => { useEditorStore.getState().setAiModal('summarize') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        `massimo di ${MAX_TEXT_LENGTH} caratteri`
+      )
+      })
+    })
+
+  it('summarize: il testo esattamente al massimo passa', async () => {
+    const alLimite = 'x'.repeat(MAX_TEXT_LENGTH)
+    vi.mocked(getActiveText).mockReturnValue(alLimite)
+
+    act(() => { useEditorStore.getState().setAiModal('summarize') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    const fn = mockStart.mock.calls[0][0]
+    await fn()
+    expect(api.summarize).toHaveBeenCalledWith(alLimite, 'medio')
+  })
+
+  it('generate: il prompt oltre il massimo non parte', async () => {
+    act(() => { useEditorStore.getState().setAiModal('generate') })
+    render(<AiActionDialog />)
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'x'.repeat(MAX_PROMPT_LENGTH + 1) },
+    })
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(String(MAX_PROMPT_LENGTH))
+    })
+  })
 
 describe('AiActionDialog — lingue di destinazione (R-58-F-Ob)', () => {
   it('mostra esattamente le quattro lingue dell AdR', () => {

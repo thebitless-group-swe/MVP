@@ -8,6 +8,84 @@ export interface Note {
   updatedAt: number
 }
 
+/**
+ * Margine fra il ritorno del focus alla finestra e la conclusione che l'utente
+ * abbia annullato il selettore. Serve solo alla seconda via d'uscita del ramo
+ * di fallback: vedi `scegliFileConInput`.
+ */
+export const GRAZIA_ANNULLAMENTO_MS = 300
+
+/** Titolo di ripiego quando il file scelto non espone un nome utilizzabile. */
+const TITOLO_DI_RIPIEGO = 'Nota importata'
+
+/**
+ * Riconosce l'errore con cui il browser segnala «l'utente ha annullato».
+ *
+ * Duck typing e non `instanceof Error`: `DOMException` appartiene al realm del
+ * browser, e `instanceof` fallisce attraversando i confini di realm — iframe,
+ * worker, e l'ambiente di test, dove rendeva questo ramo non verificabile. E'
+ * anche la forma gia' adottata da `Sidebar.tsx:35,47,71`: qui c'erano due
+ * convenzioni diverse per lo stesso controllo, e questa e' la piu' robusta.
+ */
+function eAnnullamento(err: unknown): boolean {
+  return err != null && (err as { name?: string }).name === 'AbortError'
+}
+
+/**
+ * Ramo di fallback per i browser privi di File System Access API.
+ *
+ * Non e' un caso limite: **R-1-V-Ob impone anche Firefox**, che quell'API non
+ * ce l'ha, quindi per un terzo dei browser obbligatori questo e' il percorso
+ * primario e deve comportarsi come l'altro.
+ *
+ * Restituisce `null` per l'annullamento e `{ text, fileName }` per la scelta.
+ * Il tipo di ritorno e' la correzione centrale: prima la Promise portava una
+ * stringa sola, e la stringa vuota non bastava a distinguere «annullato» da
+ * «file legittimamente vuoto» — un `.md` vuoto e' un file valido, e finiva
+ * scartato. Portando anche `fileName` si chiude nello stesso punto la perdita
+ * del titolo della nota su Firefox.
+ */
+function scegliFileConInput(): Promise<{ text: string; fileName: string } | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.md,.txt'
+
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return resolve(null)
+      const reader = new FileReader()
+      reader.onload = () =>
+        resolve({ text: (reader.result as string) ?? '', fileName: file.name })
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(file)
+    }
+
+    input.oncancel = () => resolve(null)
+
+    // Seconda via d'uscita. `oncancel` non e' emesso da tutti i browser: dove
+    // manca, annullare il selettore non produce alcun evento e questa Promise
+    // resterebbe pendente per sempre, lasciando l'interfaccia bloccata senza
+    // alcun segnale. Il ritorno del focus alla finestra e' l'unico appiglio
+    // disponibile in quel caso. Il margine serve perche' `change` arriva subito
+    // dopo il focus quando una scelta c'e' stata davvero; si controlla
+    // `input.files` e non un flag interno proprio perche' il browser lo popola
+    // prima di emettere `change`. Le chiamate successive a `resolve` sono
+    // inerti, quindi questa guardia non puo' sovrascrivere una scelta valida.
+    window.addEventListener(
+      'focus',
+      () => {
+        setTimeout(() => {
+          if (!input.files?.length) resolve(null)
+        }, GRAZIA_ANNULLAMENTO_MS)
+      },
+      { once: true },
+    )
+
+    input.click()
+  })
+}
+
 /** Apre una nota leggendo un file dal filesystem (File System Access API con fallback input) */
 export async function openNoteFromFile(): Promise<Note | null> {
   let text: string
@@ -31,34 +109,18 @@ export async function openNoteFromFile(): Promise<Note | null> {
       fileName = file.name
     } catch (err: unknown) {
       // L'utente ha annullato il picker
-      if (err instanceof Error && err.name === 'AbortError') return null
+      if (eAnnullamento(err)) return null
       throw err
     }
   } else {
-    // Fallback: <input type="file">
-    text = await new Promise((resolve, reject) => {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = '.md,.txt'
-      input.onchange = () => {
-        const file = input.files?.[0]
-        if (!file) return resolve('')
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = () => reject(reader.error)
-        reader.readAsText(file)
-      }
-      input.oncancel = () => resolve('')
-      input.click()
-    })
-    fileName = ''
-    if (!text) return null
+    const scelta = await scegliFileConInput()
+    if (!scelta) return null
+    text = scelta.text
+    fileName = scelta.fileName
   }
 
   const now = Date.now()
-  const title = fileName
-    ? fileName.replace(/\.(md|txt)$/i, '')
-    : 'Imported note'
+  const title = fileName ? fileName.replace(/\.(md|txt)$/i, '') : TITOLO_DI_RIPIEGO
 
   return {
     id: crypto.randomUUID(),
@@ -69,7 +131,6 @@ export async function openNoteFromFile(): Promise<Note | null> {
   }
 }
 
-/** Salva una nota su file (stub — implementato in FS-02) */
 /** Salva una nota su file (showSaveFilePicker con fallback download) */
 export async function saveNoteToFile(note: Note): Promise<void> {
   const fileName = `${note.title || 'nota'}.md`
@@ -91,11 +152,20 @@ export async function saveNoteToFile(note: Note): Promise<void> {
       await writable.write(blob)
       await writable.close()
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return
+      if (eAnnullamento(err)) return
       throw err
     }
   } else {
-    // Fallback: download automatico
+    // Fallback: download automatico.
+    //
+    // ATTENZIONE — punto aperto, non verificabile in jsdom. L'ancora non viene
+    // inserita nel documento e `revokeObjectURL` e' invocato nell'istruzione
+    // successiva al click, mentre il download e' asincrono: sono due pattern
+    // storicamente fragili su Firefox, che e' proprio il browser per cui questo
+    // ramo esiste. Non sono stati modificati perche' la correzione va decisa
+    // sulla verifica in browser reale (#32, passo 4) e non su una supposizione:
+    // toccarli alla cieca significherebbe sostituire un rischio non misurato
+    // con una modifica non verificata.
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

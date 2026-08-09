@@ -13,14 +13,24 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 class DummyLLMClient(LLMClient):
-    """Client LLM finto per test: yielda chunk fissi senza I/O."""
+    """Client LLM finto per test: yielda chunk fissi senza I/O.
+
+    Registra in `received_messages` i messaggi con cui viene invocato: e' cosi'
+    che i test degli use case di `core/services/` verificano il prompt prodotto
+    senza passare da HTTP. La registrazione avviene alla prima iterazione dello
+    stream, non alla chiamata di `stream()`, perche' il corpo di un generatore
+    asincrono non viene eseguito finche' nessuno lo consuma; resta `None`
+    finche' lo stream e' freddo.
+    """
 
     DEFAULT_CHUNKS = ["chunk1 ", "chunk2 ", "fine"]
 
     def __init__(self, chunks: list[str] | None = None) -> None:
         self._chunks = chunks if chunks is not None else self.DEFAULT_CHUNKS
+        self.received_messages: list[dict] | None = None
 
     async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+        self.received_messages = messages
         for chunk in self._chunks:
             yield chunk
 

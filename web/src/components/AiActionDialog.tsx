@@ -54,7 +54,6 @@ const STYLES = [
 
 type HatDef = {
   value: Hat
-  emoji: string
   label: string
   description: string
   color: string
@@ -63,12 +62,12 @@ type HatDef = {
 // R-65 -> R-70-F-Ob: i sei cappelli. Le etichette («Informativo», «Emotivo», …)
 // sono di interfaccia; i `value` sono i nomi dei colori attesi dal contratto.
 const HAT_DEFS = [
-  { value: 'bianco', emoji: '⚪', label: 'Informativo', description: 'Fatti, dati e informazioni oggettive', color: 'border-gray-300 bg-gray-50 text-gray-800' },
-  { value: 'rosso', emoji: '🔴', label: 'Emotivo', description: 'Intuizioni, emozioni e sensazioni', color: 'border-red-300 bg-red-50 text-red-800' },
-  { value: 'nero', emoji: '⚫', label: 'Critico', description: 'Difficoltà, rischi e punti deboli', color: 'border-gray-700 bg-gray-800 text-gray-100' },
-  { value: 'giallo', emoji: '🟡', label: 'Ottimista', description: 'Vantaggi, benefici e opportunità', color: 'border-yellow-300 bg-yellow-50 text-yellow-800' },
-  { value: 'verde', emoji: '🟢', label: 'Creativo', description: 'Nuove idee, alternative e soluzioni', color: 'border-green-300 bg-green-50 text-green-800' },
-  { value: 'blu', emoji: '🔵', label: 'Organizzativo', description: 'Processo, struttura e prossimi passi', color: 'border-blue-300 bg-blue-50 text-blue-800' },
+  { value: 'bianco', label: 'Informativo', description: 'Fatti, dati e informazioni oggettive', color: 'border-gray-300 bg-gray-50 text-gray-900' },
+  { value: 'rosso', label: 'Emotivo', description: 'Intuizioni, emozioni e sensazioni', color: 'border-red-300 bg-red-50 text-red-900' },
+  { value: 'nero', label: 'Critico', description: 'Difficoltà, rischi e punti deboli', color: 'border-gray-500 bg-gray-300 text-gray-900' },
+  { value: 'giallo', label: 'Ottimista', description: 'Vantaggi, benefici e opportunità', color: 'border-yellow-300 bg-yellow-50 text-yellow-900' },
+  { value: 'verde', label: 'Creativo', description: 'Nuove idee, alternative e soluzioni', color: 'border-green-300 bg-green-50 text-green-900' },
+  { value: 'blu', label: 'Organizzativo', description: 'Processo, struttura e prossimi passi', color: 'border-blue-300 bg-blue-50 text-blue-900' },
 ] satisfies HatDef[]
 
 // Esaustivita' nella direzione opposta a `satisfies`.
@@ -170,7 +169,7 @@ function HatSelector({
         Prospettiva (cappello)
       </legend>
       <div role="radiogroup" aria-label="Seleziona cappello" className="grid grid-cols-2 gap-2">
-        {HAT_DEFS.map(({ value: v, emoji, label, description, color }) => {
+        {HAT_DEFS.map(({ value: v, label, description, color }) => {
           const active = value === v
           return (
             <button
@@ -180,13 +179,16 @@ function HatSelector({
               aria-checked={active}
               onClick={() => onChange(v)}
               className={cn(
-                'flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left text-sm transition-colors',
+                'flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left text-sm transition-all',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                active ? color : 'border-border bg-background text-foreground hover:bg-muted',
+                color,
+                active
+                  ? 'ring-2 ring-offset-2 ring-foreground'
+                  : 'opacity-80 hover:opacity-100',
               )}
             >
-              <span className="font-medium">{emoji} {label}</span>
-              <span className="text-xs opacity-70">{description}</span>
+              <span className="font-medium">{label}</span>
+              <span className="text-xs opacity-75">{description}</span>
             </button>
           )
         })}
@@ -242,6 +244,8 @@ export function AiActionDialog() {
     JSON.stringify(lastCall.params) === JSON.stringify(params)
 
   const inputTooShort = currentInput.length < action.minLength
+  const inputTooLong =
+    action.maxLength !== null && currentInput.length > action.maxLength
 
 
   const handleGenerate = () => {
@@ -249,6 +253,13 @@ export function AiActionDialog() {
     if (inputTooShort) {
       setValidationError(
         `Servono almeno ${action.minLength} caratteri di testo.`,
+      )
+      return
+    }
+    if (inputTooLong) {
+      setValidationError(
+        `Il testo supera il massimo di ${action.maxLength} caratteri ` +
+          `(attuali: ${currentInput.length}). Riducilo o elaboralo in più parti.`,
       )
       return
     }

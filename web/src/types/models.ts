@@ -36,3 +36,9 @@ export type ApiConstants = components['schemas']['ApiConstants'];
  */
 export const NO_ERRORS_MARKER: ApiConstants['no_errors_marker'] =
   'NESSUN_ERRORE_RILEVATO';
+
+export const MIN_TEXT_LENGTH: ApiConstants['min_text_length'] = 10;
+export const MIN_PROMPT_LENGTH: ApiConstants['min_prompt_length'] = 3;
+
+export const MAX_TEXT_LENGTH: ApiConstants['max_text_length'] = 12000;
+export const MAX_PROMPT_LENGTH: ApiConstants['max_prompt_length'] = 2000;

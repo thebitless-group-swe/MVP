@@ -27,14 +27,6 @@ class ContentExtractor(ABC):
             rispettare, e chi consuma la porta si fiderebbe di una garanzia
             che non esiste.
 
-            Il residuo, dichiarato e non pagato in anticipo: nessun vincolo di
-            dominio limita oggi il contenuto estratto da link. `LinkRequest`
-            porta un URL e non del testo, quindi il `max_length` sui DTO
-            previsto dalla #33 non raggiunge questo percorso, e l'unico argine
-            resta la costante privata dell'adattatore. Il cap appartiene al
-            dominio: va con la #33, con la costante in `core/domain/values.py`
-            (#11).
-
         Raises:
             ContentExtractorError: Se l'estrazione fallisce (rete, permessi, contenuto vuoto, ecc.).
         """

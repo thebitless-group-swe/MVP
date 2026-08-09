@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from ..core.ports.llm_client import LLMClient
+from ..core.services.generate import generate as generate_service
 from ..infrastructure.adapters.sse_streaming import sse_response
 from ..llm import get_llm_client
-from ..llm.prompts import build_generate_messages
 from ..schemas import GenerateRequest
 
 router = APIRouter(prefix="/api", tags=["generate"])
@@ -20,5 +20,7 @@ async def generate(
     request: Request,
     client: LLMClient = Depends(get_llm_client),
 ) -> StreamingResponse:
-    messages = build_generate_messages(payload.prompt, payload.length)
-    return await sse_response(request, client.stream(messages), "generazione", logger)
+    #Alias sull'import: il caso d'uso si chiama come questo handler, e il nome
+    #dell'handler non puo' cambiare perche' FastAPI ci deriva l'operationId.
+    chunks = generate_service(payload.prompt, payload.length, client)
+    return await sse_response(request, chunks, "generazione", logger)
