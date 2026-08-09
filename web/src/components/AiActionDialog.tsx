@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Dialog } from 'radix-ui'
-
+import {
+  useAiModal,
+  useEditorStore,
+  useErrorMessage,
+  useIsGenerating,
+  useStreamedOutput,
+  type AiActionId,
+} from '@/store/useEditorStore'
 import { MarkdownView } from '@/components/MarkdownView'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -10,14 +17,6 @@ import { api } from '@/lib/api'
 import { AI_ACTIONS, getActiveText, type AiParams } from '@/lib/aiActions'
 import { cn } from '@/lib/utils'
 import type { Length, Language, Style, Hat } from '@/types/models'
-import {
-  useAiModal,
-  useEditorStore,
-  useErrorMessage,
-  useIsGenerating,
-  useStreamedOutput,
-  type AiActionId,
-} from '@/store/useEditorStore'
 import { NO_ERRORS_MARKER } from '@/types/models'
 
 

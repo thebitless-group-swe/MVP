@@ -14,6 +14,7 @@ export type AiActionDef = {
   source: 'text' | 'prompt' | 'url'
   insertMode: 'replace' | 'append'
   minLength: number
+  maxLength: number | null
 }
 
 export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
@@ -22,42 +23,49 @@ export const AI_ACTIONS: Record<AiActionId, AiActionDef> = {
     source: 'text',
     insertMode: 'replace',
     minLength: 10,
+    maxLength: 10000,
   },
   translate: {
     label: 'Traduci',
     source: 'text',
     insertMode: 'replace',
     minLength: 10,
+    maxLength: 10000,
   },
   rewrite: {
     label: 'Riscrivi',
     source: 'text',
     insertMode: 'replace',
     minLength: 10,
+    maxLength: 10000,
   },
   grammar: {
     label: 'Grammatica',
     source: 'text',
     insertMode: 'replace',
     minLength: 10,
+    maxLength: 10000,
   },
   critique: {
     label: 'Analisi',
     source: 'text',
     insertMode: 'append',
     minLength: 10,
+    maxLength: 10000,
   },
   generate: {
     label: 'Genera',
     source: 'prompt',
     insertMode: 'append',
     minLength: 3,
+    maxLength: 1000,
   },
   'generate-link': {
     label: 'Genera da link',
     source: 'url',
     insertMode: 'append',
     minLength: 1,
+    maxLength: null,
   },
 }
 

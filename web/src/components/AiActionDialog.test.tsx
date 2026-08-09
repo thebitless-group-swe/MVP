@@ -331,17 +331,24 @@ describe('AiActionDialog — critique (cappelli)', () => {
     radios.forEach((r) => expect(r).toHaveAttribute('aria-checked', 'false'))
   })
 
-  it('click cappello → valore di contratto nel body, non nome inglese', async () => {
+  it.each([
+    ['informativo', 'bianco'],
+    ['emotivo', 'rosso'],
+    ['critico', 'nero'],
+    ['ottimista', 'giallo'],
+    ['creativo', 'verde'],
+    ['organizzativo', 'blu'],
+  ])('%s → hat «%s» nel body, non il nome inglese', async (etichetta, valore) => {
     act(() => { useEditorStore.getState().setAiModal('critique') })
     render(<AiActionDialog />)
 
-    await userEvent.click(screen.getByRole('radio', { name: /critico/i }))
+    await userEvent.click(screen.getByRole('radio', { name: new RegExp(etichetta, 'i') }))
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
     await fn()
-    expect(api.critique).toHaveBeenCalledWith(ACTIVE_TEXT, 'nero')
+    expect(api.critique).toHaveBeenCalledWith(ACTIVE_TEXT, valore)
   })
 
   it('senza cappello → nessuna fetch, mostra alert', async () => {
