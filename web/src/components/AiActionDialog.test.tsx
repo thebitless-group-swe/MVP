@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiActionDialog } from '@/components/AiActionDialog'
 import { api } from '@/lib/api'
 import { useEditorStore } from '@/store/useEditorStore'
-import { NO_ERRORS_MARKER } from '@/types/models'
+import {
+  MAX_PROMPT_LENGTH,
+  MAX_TEXT_LENGTH,
+  NO_ERRORS_MARKER,
+} from '@/types/models'
 import { AI_ACTIONS } from '@/lib/aiActions'
 
 // Hoisted: i mock devono essere pronti prima che vi.mock li usi
@@ -226,6 +230,52 @@ describe('AiActionDialog — testo insufficiente (R-81)', () => {
   })
 })
 
+describe('AiActionDialog — testo oltre il massimo', () => {
+  it('summarize: nessuna fetch, e l alert dice quanto e il massimo', async () => {
+    vi.mocked(getActiveText).mockReturnValue('x'.repeat(MAX_TEXT_LENGTH + 1))
+
+    act(() => { useEditorStore.getState().setAiModal('summarize') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(String(MAX_TEXT_LENGTH))
+    })
+  })
+
+  it('summarize: il testo esattamente al massimo passa', async () => {
+    const alLimite = 'x'.repeat(MAX_TEXT_LENGTH)
+    vi.mocked(getActiveText).mockReturnValue(alLimite)
+
+    act(() => { useEditorStore.getState().setAiModal('summarize') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).toHaveBeenCalledWith({
+      endpoint: expect.stringContaining('/api/summarize'),
+      body: { text: alLimite, length: 'medio' },
+    })
+  })
+
+  it('generate: il prompt oltre il massimo non parte', async () => {
+    act(() => { useEditorStore.getState().setAiModal('generate') })
+    render(<AiActionDialog />)
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'x'.repeat(MAX_PROMPT_LENGTH + 1) },
+    })
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(mockStart).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(String(MAX_PROMPT_LENGTH))
+    })
+  })
+})
+
 describe('AiActionDialog — lingue di destinazione (R-58-F-Ob)', () => {
   it('mostra esattamente le quattro lingue dell AdR', () => {
     act(() => { useEditorStore.getState().setAiModal('translate') })
@@ -335,7 +385,7 @@ describe('AiActionDialog — critique (cappelli)', () => {
     act(() => { useEditorStore.getState().setAiModal('critique') })
     render(<AiActionDialog />)
 
-    await userEvent.click(screen.getByRole('radio', { name: /critico/i }))
+    await userEvent.click(screen.getByRole('radio', { name: new RegExp(etichetta, 'i') }))
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
     expect(mockStart).toHaveBeenCalledTimes(1)

@@ -118,6 +118,14 @@ def _describe_validation_error(error: dict) -> str:
         if minimum is not None:
             return f"Il campo «{label}» deve contenere almeno {minimum} caratteri."
         return f"Il campo «{label}» è troppo corto."
+    if kind == "string_too_long":
+        massimo = error.get("ctx", {}).get("max_length")
+        if massimo is not None:
+            return (
+                f"Il campo «{label}» non può superare {massimo} caratteri: "
+                "riduci il testo o elaboralo in più parti."
+            )
+        return f"Il campo «{label}» è troppo lungo."
     if kind == "literal_error":
         #Non elenchiamo i valori ammessi leggendoli da `ctx`: sono un dettaglio
         #interno di Pydantic e arrivano in inglese. L'interfaccia propone

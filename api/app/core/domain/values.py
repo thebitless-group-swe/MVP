@@ -26,12 +26,20 @@ Style = Literal["formale", "informale", "accademico"]
 Hat = Literal["bianco", "rosso", "giallo", "nero", "verde", "blu"]
 
 # Lunghezza minima del testo accettato dalle funzioni AI (R-81).
-MIN_TEXT_LENGTH = 10
+MinTextLength = Literal[10]
+MIN_TEXT_LENGTH: MinTextLength = 10
 
 # Lunghezza minima delle istruzioni accettate dalla generazione: un prompt piu'
 # corto non identifica un contenuto, e spendere una chiamata al provider per
 # scoprirlo e' spreco.
-MIN_PROMPT_LENGTH = 3
+MinPromptLength = Literal[3]
+MIN_PROMPT_LENGTH: MinPromptLength = 3
+
+MaxTextLength = Literal[12000]
+MAX_TEXT_LENGTH: MaxTextLength = 12000
+
+MaxPromptLength = Literal[2000]
+MAX_PROMPT_LENGTH: MaxPromptLength = 2000
 
 # Sentinella emessa dalla correzione grammaticale quando non trova errori.
 # Il tipo viene esposto in /openapi.json da ApiConstants (routes/constants.py);

@@ -134,9 +134,9 @@ class TestNoErrorsSentinel:
     def test_sentinel_is_published_in_the_api_contract(
         self, client: TestClient
     ) -> None:
-        assert client.get("/api/constants").json() == {
-            "no_errors_marker": NO_ERRORS_MARKER
-        }
+        assert client.get("/api/constants").json()["no_errors_marker"] == (
+            NO_ERRORS_MARKER
+        )
 
     def test_sentinel_is_a_const_in_the_openapi_schema(
         self, client: TestClient
