@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from ..core.ports.llm_client import LLMClient
+from ..core.services.grammar import grammar as grammar_service
 from ..infrastructure.adapters.sse_streaming import sse_response
 from ..llm import get_llm_client
-from ..llm.prompts import build_grammar_messages
 from ..schemas import GrammarRequest
 
 router = APIRouter(prefix="/api", tags=["grammar"])
@@ -20,5 +20,7 @@ async def grammar(
     request: Request,
     client: LLMClient = Depends(get_llm_client),
 ) -> StreamingResponse:
-    messages = build_grammar_messages(payload.text)
-    return await sse_response(request, client.stream(messages), "correzione", logger)
+    #Alias sull'import: il caso d'uso si chiama come questo handler, e il nome
+    #dell'handler non puo' cambiare perche' FastAPI ci deriva l'operationId.
+    chunks = grammar_service(payload.text, client)
+    return await sse_response(request, chunks, "correzione", logger)
