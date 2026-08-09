@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useAiStream } from '@/hooks/useAiStream'
@@ -72,12 +71,19 @@ describe('useAiStream', () => {
     const { result } = renderHook(() => useAiStream())
     const errorMsg = 'Errore interno'
 
-    async function* failingIterable(): AsyncIterable<string> {
-      throw new Error(errorMsg)
+  // Crea un iterable che lancia un errore quando viene iterato
+  const failingIterable: AsyncIterable<string> = {
+    [Symbol.asyncIterator]() {
+      return {
+        async next(): Promise<IteratorResult<string>> {
+          throw new Error(errorMsg)
+        },
+      }
+    },
     }
 
     await act(async () => {
-      await result.current.start(failingIterable)
+      await result.current.start(() => failingIterable)
     })
 
     expect(result.current.status).toBe('error')
