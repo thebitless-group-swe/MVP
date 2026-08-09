@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from ..core.ports.llm_client import LLMClient
+from ..core.services.rewrite import rewrite as rewrite_service
 from ..infrastructure.adapters.sse_streaming import sse_response
 from ..llm import get_llm_client
-from ..llm.prompts import build_rewrite_messages
 from ..schemas import RewriteRequest
 
 router = APIRouter(prefix="/api", tags=["rewrite"])
@@ -20,5 +20,7 @@ async def rewrite(
     request: Request,
     client: LLMClient = Depends(get_llm_client),
 ) -> StreamingResponse:
-    messages = build_rewrite_messages(payload.text, payload.style)
-    return await sse_response(request, client.stream(messages), "riscrittura", logger)
+    #Alias sull'import: il caso d'uso si chiama come questo handler, e il nome
+    #dell'handler non puo' cambiare perche' FastAPI ci deriva l'operationId.
+    chunks = rewrite_service(payload.text, payload.style, client)
+    return await sse_response(request, chunks, "riscrittura", logger)
