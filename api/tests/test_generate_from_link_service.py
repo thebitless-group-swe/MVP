@@ -32,7 +32,7 @@ from app.core.services.generate_from_link import (
     generate_from_link,
     validate_link,
 )
-from app.llm.prompts import LENGTH_INSTRUCTIONS, build_generate_messages
+from app.llm.prompts import LENGTH_INSTRUCTIONS, build_generate_from_link_messages
 from tests.conftest import DummyContentExtractor, DummyLLMClient
 
 CONTENUTO_ESTRATTO = "Contenuto di esempio per il test."
@@ -80,20 +80,6 @@ class LLMClientSpia(DummyLLMClient):
 
 async def _collect(stream: AsyncIterator[str]) -> list[str]:
     return [chunk async for chunk in stream]
-
-
-def _prompt_atteso(testo: str) -> str:
-    """Ricostruisce il prompt che lo use case compone attorno al testo estratto.
-
-    Duplica di proposito la stringa del servizio: e' cio' che rende il test
-    capace di accorgersi di una modifica al prompt. La #17 promuovera' quel
-    testo a template di dominio con system e user separati, e allora questo
-    helper sparira' insieme alla duplicazione.
-    """
-    return (
-        "Scrivi un testo originale in italiano evitando frasi introduttive di "
-        f"qualsiasi tipo basato sul seguente contenuto estratto da link: {testo}"
-    )
 
 
 # Extractor che estrae correttamente → fetch_and_extract ritorna il contenuto della porta
@@ -175,8 +161,8 @@ async def test_generate_from_link_passes_the_extracted_text_to_the_llm_port(
     )
     await _collect(stream)
 
-    assert dummy_llm_client.received_messages == build_generate_messages(
-        _prompt_atteso(CONTENUTO_ESTRATTO), length
+    assert dummy_llm_client.received_messages == build_generate_from_link_messages(
+        CONTENUTO_ESTRATTO, length
     )
 
 
@@ -254,6 +240,6 @@ async def test_generate_from_link_caps_the_extracted_text_in_the_prompt(
     )
     await _collect(stream)
 
-    assert dummy_llm_client.received_messages == build_generate_messages(
-        _prompt_atteso("x" * MAX_TEXT_LENGTH), "medio"
+    assert dummy_llm_client.received_messages == build_generate_from_link_messages(
+        "x" * MAX_TEXT_LENGTH, "medio"
     )

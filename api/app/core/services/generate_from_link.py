@@ -1,11 +1,19 @@
 """Use case: generare un testo a partire dal link di una pagina (UC 63).
 
-Vive in `core/services/` perche' dipende solo dalle porte `ContentExtractor` e
-`LLMClient`: non conosce gli adattatori che le soddisfano ne' il trasporto che
-le invoca. L'estrazione era gia' cosi' quando stava in `llm/fetch_url.py` — era
-l'unico modulo del backend a rispettare pienamente l'inversione delle
-dipendenze — ma il package lo teneva fra dominio e infrastruttura, dove nessuno
-lo avrebbe cercato.
+Vive in `core/services/` perche' non conosce gli adattatori che soddisfano le
+sue due porte, `ContentExtractor` e `LLMClient`, ne' il trasporto che lo invoca.
+L'estrazione era gia' cosi' quando stava in `llm/fetch_url.py`, ma il package lo
+teneva fra dominio e infrastruttura, dove nessuno lo avrebbe cercato.
+
+Fino alla #17 questo modulo era l'unico del backend a dipendere *solo* da porte,
+e il docstring se ne vantava. Non e' piu' vero: la #17 gli ha dato un template
+di prompt, e i template stanno ancora in `llm/prompts.py`, quindi
+`build_generate_from_link_messages` e' un import che punta fuori da `core/`.
+La stessa deroga di summarize.py, per la stessa ragione — i prompt sono dominio
+ma non sono ancora collocati nel dominio — e finche' dura e' l'unica freccia di
+questo modulo che non punta verso il centro. Vale la pena saperlo: essendo
+l'unico modulo che aveva la proprieta' piena, e' anche l'argomento piu' forte a
+favore dell'issue che promuove i prompt dentro `core/`.
 
 Forma e convenzioni sono quelle fissate dal pilota in summarize.py. E' l'unico
 dei sette use case a dipendere da due porte, e questo si riflette in due punti:
@@ -28,7 +36,7 @@ puo' continuare a catturare il solo `FetchError`.
 """
 from collections.abc import AsyncIterator
 
-from ...llm.prompts import build_generate_messages
+from ...llm.prompts import build_generate_from_link_messages
 from ..domain.values import MAX_TEXT_LENGTH, Length
 from ..ports.content_extractor import ContentExtractor, ContentExtractorError
 from ..ports.llm_client import LLMClient
@@ -73,8 +81,4 @@ async def generate_from_link(
     validate_link(url)
     text = await fetch_and_extract(url, extractor)
 
-    generation_prompt = (
-        "Scrivi un testo originale in italiano evitando frasi introduttive di "
-        f"qualsiasi tipo basato sul seguente contenuto estratto da link: {text}"
-    )
-    return llm.stream(build_generate_messages(generation_prompt, length))
+    return llm.stream(build_generate_from_link_messages(text, length))
