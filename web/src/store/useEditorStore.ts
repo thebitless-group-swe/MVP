@@ -18,6 +18,8 @@ export type AiModal = null | AiActionId
 interface EditorState {
   currentText: string
   setCurrentText: (text: string) => void
+  loadDocument: (text: string) => void
+  _loadVersion: number
   selectedText: string
   setSelectedText: (text: string) => void
   reset: () => void
@@ -45,6 +47,11 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set, get) => ({
   currentText: '',
   setCurrentText: (text) => set({ currentText: text }),
+  loadDocument: (text) => {
+    if (get().currentText === text) return
+    set((s) => ({ currentText: text, _loadVersion: s._loadVersion + 1 }))
+  },
+  _loadVersion: 0,
   selectedText: '',
   setSelectedText: (text) => set({ selectedText: text }),
   reset: () => set({ currentText: '', selectedText: '' }),

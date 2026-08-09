@@ -38,7 +38,7 @@ export const useNotesStore = create<NotesState>()(
         updatedAt: now,
   }
   set((s) => ({ list: [...s.list, note], currentId: note.id }))
-  useEditorStore.getState().setCurrentText('')
+  useEditorStore.getState().loadDocument('')
   return note
 },
 
@@ -54,7 +54,7 @@ export const useNotesStore = create<NotesState>()(
         }
         set({ currentId: id })
         const note = get().list.find((n) => n.id === id)
-        if (note) useEditorStore.getState().setCurrentText(note.content)
+        if (note) useEditorStore.getState().loadDocument(note.content)
       },
 
       updateCurrent(patch) {
@@ -94,7 +94,7 @@ loadNote: (noteData) => {
       : [...s.list, note]
     return { list: newList, currentId: note.id }
   })
-  useEditorStore.getState().setCurrentText(note.content)
+  useEditorStore.getState().loadDocument(note.content)
 },
     }),
     { name: 'notes_persistence', 
@@ -102,7 +102,7 @@ loadNote: (noteData) => {
         if(!state) return
         const currentNote = state.list.find((n) => n.id === state.currentId)
         if (currentNote) {
-          useEditorStore.getState().setCurrentText(currentNote.content)
+          useEditorStore.getState().loadDocument(currentNote.content)
         }
       }
     }
