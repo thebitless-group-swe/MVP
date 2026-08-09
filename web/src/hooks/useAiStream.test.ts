@@ -74,7 +74,6 @@ describe('useAiStream', () => {
 
     async function* failingIterable(): AsyncIterable<string> {
       throw new Error(errorMsg)
-      yield // per evitare il warning "no yield"
     }
 
     await act(async () => {
