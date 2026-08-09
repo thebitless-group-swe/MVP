@@ -5,8 +5,8 @@ from fastapi.responses import StreamingResponse
 
 from ..core.ports.llm_client import LLMClient
 from ..core.services.critique import critique as critique_service
+from ..dependencies import get_llm_client
 from ..infrastructure.adapters.sse_streaming import sse_response
-from ..llm import get_llm_client
 from ..schemas import CritiqueRequest
 
 router = APIRouter(prefix="/api", tags=["critique"])

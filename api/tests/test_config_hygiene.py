@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.core.services.generate_from_link import MAX_URL_LENGTH
-from app.llm import get_llm_client
+from app.dependencies import get_llm_client
 from app.main import app
 from app.schemas import LinkRequest
 from app.settings import Settings

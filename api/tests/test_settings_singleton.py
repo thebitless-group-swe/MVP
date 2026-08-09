@@ -1,4 +1,5 @@
-from app.settings import Settings, get_settings
+from app.dependencies import get_settings
+from app.settings import Settings
 
 
 def test_get_settings_returns_settings_instance() -> None:

@@ -30,7 +30,7 @@ class LiteLLMClient(LLMClient):
         #da `get_settings()` legherebbe una classe di infrastruttura al
         #singleton globale e renderebbe impossibile istanziarla nei test senza
         #toccare l'ambiente. Stessa scelta di `TavilyExtractor`; il composition
-        #root (`llm/__init__.py`) e' l'unico a sapere da dove arriva.
+        #root (`app/dependencies.py`) e' l'unico a sapere da dove arriva.
         self._settings = settings
         self._client = httpx.AsyncClient(
             base_url=settings.litellm_base_url,

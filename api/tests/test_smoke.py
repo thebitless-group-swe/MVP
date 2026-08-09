@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.llm import get_content_extractor, get_llm_client
+from app.dependencies import get_content_extractor, get_llm_client
 from app.main import app
 from tests.conftest import DummyContentExtractor, DummyLLMClient
 

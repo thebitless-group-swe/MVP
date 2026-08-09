@@ -22,11 +22,15 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.core.ports.content_extractor import ContentExtractor
+from app.dependencies import (
+    _CHIAVE_MANCANTE_DETAIL,
+    get_content_extractor,
+    get_llm_client,
+    get_settings,
+)
 from app.infrastructure.adapters.tavily_extractor import TavilyExtractor
-from app.llm import _CHIAVE_MANCANTE_DETAIL, get_content_extractor, get_llm_client
 from app.main import app
 from app.routes.generate_link import _FETCH_FAILED_DETAIL
-from app.settings import get_settings
 from tests.conftest import DummyLLMClient
 
 
