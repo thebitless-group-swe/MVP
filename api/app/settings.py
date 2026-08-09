@@ -1,5 +1,9 @@
-from functools import lru_cache
+"""*Cosa* e' la configurazione del processo.
 
+*Come* la si ottiene — il provider memoizzato `get_settings` — sta invece in
+`dependencies.py` insieme agli altri due (#18): i provider stanno tutti nel
+composition root, questo modulo conserva il solo schema.
+"""
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,13 +15,3 @@ class Settings(BaseSettings):
     litellm_api_key: str = ""
     tavily_api_key: str = ""
     cors_origins: list[str] = ["http://localhost:5173"]
-
-
-#lru cache esegue la funzione e memorizza il risultato nella cache;
-#Le successive chiamate con gli stessi argomenti restituiscono lo stesso
-#risultato salvato in cache (oggetto cached)
-#In questo caso non ci sono argomenti -> sempre stessa chiave
-#Viene eseguito una volta sola, avendo così un'istanza unica per processo (Pattern Singleton)
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()

@@ -1,5 +1,5 @@
+from app.dependencies import get_llm_client
 from app.infrastructure.adapters.litellm_client import LiteLLMClient
-from app.llm import get_llm_client
 
 
 #Pulisce la cache di @lru_cache

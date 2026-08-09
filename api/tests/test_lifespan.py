@@ -17,9 +17,8 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from app.llm import get_content_extractor, get_llm_client
+from app.dependencies import get_content_extractor, get_llm_client, get_settings
 from app.main import app
-from app.settings import get_settings
 
 
 @pytest.fixture(autouse=True)

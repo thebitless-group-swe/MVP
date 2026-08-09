@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.ports.llm_client import LLMClient
-from app.llm import get_llm_client
+from app.dependencies import get_llm_client
 from app.main import app
 from tests.conftest import DummyLLMClient
 

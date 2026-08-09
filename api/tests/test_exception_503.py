@@ -15,9 +15,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.ports.llm_client import LLMClient, LLMProviderError
-from app.llm import get_llm_client
+from app.dependencies import get_llm_client, get_settings
 from app.main import app
-from app.settings import get_settings
 
 #Valore fittizio e riconoscibile: se comparisse nella response sarebbe un leak.
 SENTINEL_API_KEY = "sk-SECRET-SENTINEL-12345"

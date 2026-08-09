@@ -6,8 +6,7 @@ from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .infrastructure.adapters.litellm_client import LiteLLMClient
-from .llm import close_content_extractor, get_llm_client
+from .dependencies import close_content_extractor, close_llm_client, get_settings
 from .routes import (
     constants_router,
     critique_router,
@@ -19,7 +18,6 @@ from .routes import (
     translate_router,
 )
 from .schemas import FIELD_LABELS, ErrorResponse
-from .settings import get_settings
 
 
 @asynccontextmanager
@@ -33,26 +31,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     aperto fino alla morte di un processo che sta comunque terminando — ma senza
     un lifespan non c'era il posto dove metterla.
 
-    Il trattamento dei due provider e' asimmetrico perche' i due problemi lo
-    sono: `get_llm_client` non ha modi di fallire e si risolve qui con un
-    `isinstance`, mentre `get_content_extractor` solleva 503 senza chiave e va
-    interrogato attraverso `close_content_extractor`, che sa come e' memoizzato.
+    Qui restano due chiamate e nessun adattatore concreto: come si chiuda
+    ciascuno dei due, e perche' le due chiusure abbiano forma diversa, e'
+    argomentato in `dependencies.py` accanto alle funzioni.
     """
     #Startup deliberatamente vuoto. E' qui che andrebbe la validazione delle
     #chiavi obbligatorie al boot: oggi una chiave mancante si scopre alla prima
     #richiesta, cioe' dal primo utente invece che dal log di avvio.
     yield
 
-    #Se nessuna richiesta e' passata, questa e' l'unica costruzione del client:
-    #lo si crea per chiuderlo subito. Costa una `httpx.AsyncClient` mai usata, e
-    #il provider non puo' fallire, quindi non vale una guardia sulla cache.
-    client = get_llm_client()
-    #La porta `LLMClient` non dichiara `aclose`, e non deve: il ciclo di vita e'
-    #dell'adattatore. Conoscere la classe concreta e' mestiere del composition
-    #root, che e' precisamente questo file.
-    if isinstance(client, LiteLLMClient):
-        await client.aclose()
-
+    await close_llm_client()
     await close_content_extractor()
 
 
