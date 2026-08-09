@@ -41,7 +41,14 @@ from app.core.domain.prompts.templates import (
     build_summarize_messages,
     build_translate_messages,
 )
-from app.core.domain.values import NO_ERRORS_MARKER, Hat, Language, Length, Style
+from app.core.domain.values import (
+    NO_ERRORS_MARKER,
+    Hat,
+    Language,
+    Length,
+    Message,
+    Style,
+)
 
 TESTO = "Un testo di prova abbastanza lungo da superare la validazione di schema."
 
@@ -71,7 +78,7 @@ REGOLE_ATTESE: dict[str, tuple[str, ...]] = {
 #Le tredici varianti: le sette operazioni per i valori che ne cambiano il
 #prompt. La chiave e' "operazione/variante" perche' le regole attese si
 #leggono per operazione.
-CASI: list[tuple[str, Callable[[str], list[dict]]]] = [
+CASI: list[tuple[str, Callable[[str], list[Message]]]] = [
     *[(f"summarize/{length}", lambda t, x=length: build_summarize_messages(t, x))
       for length in get_args(Length)],
     *[(f"generate/{length}", lambda t, x=length: build_generate_messages(t, x))
@@ -91,18 +98,18 @@ CASI: list[tuple[str, Callable[[str], list[dict]]]] = [
 IDS = [nome for nome, _ in CASI]
 
 
-def _system(msgs: list[dict]) -> str:
+def _system(msgs: list[Message]) -> str:
     """Contenuto del messaggio di sistema.
 
     Le due funzioni di accesso esistono per un motivo solo: quando i messaggi
     smetteranno di essere dizionari e diventeranno il value object `Message`,
     a cambiare sara' questa riga e non le venti asserzioni che la usano.
     """
-    return msgs[0]["content"]
+    return msgs[0].content
 
 
-def _user(msgs: list[dict]) -> str:
-    return msgs[1]["content"]
+def _user(msgs: list[Message]) -> str:
+    return msgs[1].content
 
 
 @pytest.mark.parametrize(("nome", "build"), CASI, ids=IDS)
@@ -110,21 +117,21 @@ class TestStrutturaDelRisultato:
     """Cio' che ogni builder produce, indipendentemente da cosa ci scrive dentro."""
 
     def test_due_messaggi_system_poi_user(
-        self, nome: str, build: Callable[[str], list[dict]]
+        self, nome: str, build: Callable[[str], list[Message]]
     ) -> None:
         msgs = build(TESTO)
 
         assert len(msgs) == 2
-        assert msgs[0]["role"] == "system"
-        assert msgs[1]["role"] == "user"
+        assert msgs[0].role == "system"
+        assert msgs[1].role == "user"
 
     def test_il_messaggio_utente_e_esattamente_il_testo_ricevuto(
-        self, nome: str, build: Callable[[str], list[dict]]
+        self, nome: str, build: Callable[[str], list[Message]]
     ) -> None:
         assert _user(build(TESTO)) == TESTO
 
     def test_il_testo_utente_non_finisce_nel_system_prompt(
-        self, nome: str, build: Callable[[str], list[dict]]
+        self, nome: str, build: Callable[[str], list[Message]]
     ) -> None:
         #Il marcatore rende il test capace di accorgersi anche di una
         #concatenazione parziale, che un confronto sull'intero testo non
@@ -136,7 +143,7 @@ class TestStrutturaDelRisultato:
 
 @pytest.mark.parametrize(("nome", "build"), CASI, ids=IDS)
 def test_ogni_prompt_dichiara_le_proprie_regole(
-    nome: str, build: Callable[[str], list[dict]]
+    nome: str, build: Callable[[str], list[Message]]
 ) -> None:
     """Nessuna regola si perde nel passaggio a costanti condivise."""
     operazione = nome.split("/")[0]
@@ -185,7 +192,7 @@ def test_le_dodici_operazioni_hanno_dodici_prompt_distinti() -> None:
 )
 def test_il_parametro_cambia_il_prompt(
     variabile: str,
-    build: Callable[[str, str], list[dict]],
+    build: Callable[[str, str], list[Message]],
     valori: tuple[str, ...],
 ) -> None:
     """Un parametro ignorato produrrebbe lo stesso prompt per valori diversi.

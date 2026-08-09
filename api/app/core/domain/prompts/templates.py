@@ -14,7 +14,7 @@ Le firme sono quelle di prima del trasloco da `llm/prompts.py`: i sette use
 case di `core/services/` chiamano queste funzioni e non hanno motivo di
 cambiare per un trasloco.
 """
-from ..values import NO_ERRORS_MARKER, Hat, Language, Length, Style
+from ..values import NO_ERRORS_MARKER, Hat, Language, Length, Message, Style
 from .composer import compose
 from .rules import (
     ITALIAN_OUTPUT,
@@ -41,7 +41,7 @@ from .rules import (
 _FORMA_PROSA_ITALIANA = (ITALIAN_OUTPUT, NEUTRAL_PROSE, NO_PREAMBLE)
 
 
-def build_summarize_messages(text: str, length: Length = "medio") -> list[dict]:
+def build_summarize_messages(text: str, length: Length = "medio") -> list[Message]:
     return compose(
         role=(
             "Sei un assistente esperto nella sintesi di testi. Il tuo compito è "
@@ -55,7 +55,7 @@ def build_summarize_messages(text: str, length: Length = "medio") -> list[dict]:
     )
 
 
-def build_generate_messages(prompt: str, length: Length) -> list[dict]:
+def build_generate_messages(prompt: str, length: Length) -> list[Message]:
     return compose(
         role=(
             "Sei un assistente esperto nella scrittura di testi in italiano. Il "
@@ -75,7 +75,7 @@ def build_generate_messages(prompt: str, length: Length) -> list[dict]:
     )
 
 
-def build_generate_from_link_messages(content: str, length: Length) -> list[dict]:
+def build_generate_from_link_messages(content: str, length: Length) -> list[Message]:
     """Messaggi per la generazione a partire dal contenuto estratto da un link.
 
     Gemello del precedente, e non un suo riuso, perche' l'input non e' della
@@ -110,7 +110,7 @@ def build_generate_from_link_messages(content: str, length: Length) -> list[dict
     )
 
 
-def build_translate_messages(text: str, target_language: Language) -> list[dict]:
+def build_translate_messages(text: str, target_language: Language) -> list[Message]:
     return compose(
         role=(
             f"Sei un traduttore professionista. Il tuo compito è tradurre in "
@@ -131,7 +131,7 @@ def build_translate_messages(text: str, target_language: Language) -> list[dict]
     )
 
 
-def build_rewrite_messages(text: str, style: Style) -> list[dict]:
+def build_rewrite_messages(text: str, style: Style) -> list[Message]:
     return compose(
         role=(
             "Sei un editor esperto nella riscrittura di testi. Il tuo compito è "
@@ -157,7 +157,7 @@ def build_rewrite_messages(text: str, style: Style) -> list[dict]:
     )
 
 
-def build_grammar_messages(text: str) -> list[dict]:
+def build_grammar_messages(text: str) -> list[Message]:
     return compose(
         role=(
             "Sei un correttore di bozze. Il tuo compito è correggere gli errori "
@@ -250,7 +250,7 @@ CRITIQUE_PERSPECTIVES: dict[Hat, tuple[str, ...]] = {
 }
 
 
-def build_critique_messages(text: str, hat: Hat) -> list[dict]:
+def build_critique_messages(text: str, hat: Hat) -> list[Message]:
     """Analisi critica secondo il metodo dei Sei Cappelli (R-65 -> R-70).
 
     L'unico dei sette a non intestare la prima sezione «Regole di contenuto»:

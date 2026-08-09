@@ -12,7 +12,7 @@ from app.core.domain.prompts.templates import (
     build_rewrite_messages,
     build_translate_messages,
 )
-from app.core.domain.values import NO_ERRORS_MARKER
+from app.core.domain.values import NO_ERRORS_MARKER, Message
 from app.schemas import Hat, Language, Style
 
 TEST_TEXT = "Un testo abbastanza lungo da superare la validazione di schema."
@@ -28,13 +28,13 @@ HAT_KEYWORDS: dict[Hat, tuple[str, ...]] = {
 }
 
 
-def _assert_system_then_user(msgs: list[dict], text: str) -> None:
+def _assert_system_then_user(msgs: list[Message], text: str) -> None:
     assert len(msgs) == 2
-    assert msgs[0]["role"] == "system"
-    assert msgs[1]["role"] == "user"
-    assert msgs[1]["content"] == text
+    assert msgs[0].role == "system"
+    assert msgs[1].role == "user"
+    assert msgs[1].content == text
     #Il testo utente non deve finire nel system prompt
-    assert text not in msgs[0]["content"]
+    assert text not in msgs[0].content
 
 
 class TestTranslateMessages:
@@ -43,7 +43,7 @@ class TestTranslateMessages:
         msgs = build_translate_messages(TEST_TEXT, language)
 
         _assert_system_then_user(msgs, TEST_TEXT)
-        assert language in msgs[0]["content"]
+        assert language in msgs[0].content
 
 
 class TestRewriteMessages:
@@ -52,7 +52,7 @@ class TestRewriteMessages:
         msgs = build_rewrite_messages(TEST_TEXT, style)
 
         _assert_system_then_user(msgs, TEST_TEXT)
-        assert STYLE_INSTRUCTIONS[style] in msgs[0]["content"]
+        assert STYLE_INSTRUCTIONS[style] in msgs[0].content
 
     def test_every_style_has_its_own_instruction(self) -> None:
         instructions = list(STYLE_INSTRUCTIONS.values())
@@ -71,7 +71,7 @@ class TestGrammarMessages:
         #Il prompt non e' piu' una costante di modulo ma il risultato della
         #composizione: la sentinella si cerca dove arriva al provider.
         assert NO_ERRORS_MARKER == "NESSUN_ERRORE_RILEVATO"
-        assert NO_ERRORS_MARKER in build_grammar_messages(TEST_TEXT)[0]["content"]
+        assert NO_ERRORS_MARKER in build_grammar_messages(TEST_TEXT)[0].content
 
 
 class TestCritiqueMessages:
@@ -83,7 +83,7 @@ class TestCritiqueMessages:
 
     def test_six_hats_produce_six_distinct_system_prompts(self) -> None:
         prompts = [
-            build_critique_messages(TEST_TEXT, hat)[0]["content"]
+            build_critique_messages(TEST_TEXT, hat)[0].content
             for hat in get_args(Hat)
         ]
 
@@ -92,7 +92,7 @@ class TestCritiqueMessages:
 
     @pytest.mark.parametrize("hat", list(get_args(Hat)))
     def test_each_hat_names_its_own_perspective(self, hat: Hat) -> None:
-        system_content = build_critique_messages(TEST_TEXT, hat)[0]["content"].lower()
+        system_content = build_critique_messages(TEST_TEXT, hat)[0].content.lower()
 
         for keyword in HAT_KEYWORDS[hat]:
             assert keyword in system_content, f"cappello {hat}: manca '{keyword}'"

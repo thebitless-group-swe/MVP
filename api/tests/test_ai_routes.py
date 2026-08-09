@@ -1,10 +1,10 @@
 """Test B-04/B-05: le quattro nuove route AI."""
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.domain.values import NO_ERRORS_MARKER
+from app.core.domain.values import NO_ERRORS_MARKER, Message
 from app.core.ports.llm_client import LLMClient, LLMProviderError
 from app.dependencies import get_llm_client
 from app.infrastructure.adapters.sse_streaming import SERVICE_UNAVAILABLE_DETAIL
@@ -43,7 +43,7 @@ ROUTE_IDS = [case[0] for case in ROUTE_CASES]
 class EarlyErrorLLMClient(LLMClient):
     """Fallisce prima del primo chunk."""
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         raise LLMProviderError("Provider non raggiungibile")
         yield  # pragma: no cover - rende stream un async generator
 

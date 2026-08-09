@@ -14,10 +14,11 @@ from app.core.domain.prompts.composer import (
     compose,
 )
 from app.core.domain.prompts.rules import LENGTH_INSTRUCTIONS
+from app.core.domain.values import Message
 
 
-def _system(msgs: list[dict]) -> str:
-    return msgs[0]["content"]
+def _system(msgs: list[Message]) -> str:
+    return msgs[0].content
 
 
 class TestSezioniOpzionali:
@@ -82,8 +83,8 @@ class TestStruttura:
         msgs = compose(role="RUOLO", content_rules=("PRIMA",), user="TESTO UTENTE")
 
         assert len(msgs) == 2
-        assert msgs[0]["role"] == "system"
-        assert msgs[1] == {"role": "user", "content": "TESTO UTENTE"}
+        assert msgs[0].role == "system"
+        assert msgs[1] == Message(role="user", content="TESTO UTENTE")
         assert "TESTO UTENTE" not in _system(msgs)
 
 

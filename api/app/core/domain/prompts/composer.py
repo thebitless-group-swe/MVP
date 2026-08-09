@@ -39,7 +39,7 @@ Struttura prodotta:
 """
 from collections.abc import Sequence
 
-from ..values import Length
+from ..values import Length, Message
 from .rules import LENGTH_INSTRUCTIONS
 
 CONTENT_HEADING = "Regole di contenuto:"
@@ -60,7 +60,7 @@ def compose(
     form_rules: Sequence[str] = (),
     content_heading: str = CONTENT_HEADING,
     length: Length | None = None,
-) -> list[dict]:
+) -> list[Message]:
     """Compone i due messaggi di una richiesta al modello.
 
     Args:
@@ -93,6 +93,6 @@ def compose(
         sezioni.append(f"{LENGTH_HEADING} {LENGTH_INSTRUCTIONS[length]}")
 
     return [
-        {"role": "system", "content": "\n\n".join(sezioni)},
-        {"role": "user", "content": user},
+        Message(role="system", content="\n\n".join(sezioni)),
+        Message(role="user", content=user),
     ]

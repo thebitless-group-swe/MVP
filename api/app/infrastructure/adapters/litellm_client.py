@@ -1,8 +1,9 @@
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import httpx
 
+from ...core.domain.values import Message
 from ...core.ports.llm_client import LLMClient, LLMProviderError
 from ...settings import Settings
 
@@ -42,10 +43,15 @@ class LiteLLMClient(LLMClient):
         """Chiude il client HTTP sottostante (da invocare allo shutdown dell'app)."""
         await self._client.aclose()
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         payload = {
             "model": self._settings.litellm_model,
-            "messages": messages,
+            #L'unico punto del backend in cui un messaggio prende la forma di
+            #filo del provider. Il dominio parla di `Message`; le chiavi
+            #"role" e "content" sono protocollo, e il protocollo si conosce
+            #qui. Che la traduzione stia in una riga e' il criterio con cui si
+            #verifica di non aver modellato troppo: vedi `Message`.
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": True,
         }
         try:

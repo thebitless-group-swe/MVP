@@ -33,8 +33,8 @@ def test_returns_system_then_user_message() -> None:
     )
 
     assert len(msgs) == 2
-    assert msgs[0]["role"] == "system"
-    assert msgs[1]["role"] == "user"
+    assert msgs[0].role == "system"
+    assert msgs[1].role == "user"
 
 
 #Controllo sul contenuto del testo originale, non deve avere injection di alcun tipo
@@ -42,7 +42,7 @@ def test_user_content_is_exactly_input_text() -> None:
     text = TEST_STRING
     msgs = build_summarize_messages(text)
 
-    assert msgs[1]["content"] == text
+    assert msgs[1].content == text
 
 #Controllo che il testo non venga leakkato nelle informazioni del system
 def test_user_text_does_not_leak_into_system() -> None:
@@ -50,7 +50,7 @@ def test_user_text_does_not_leak_into_system() -> None:
     text = f"{TEST_STRING} {marker}"
     msgs = build_summarize_messages(text)
 
-    assert marker not in msgs[0]["content"]
+    assert marker not in msgs[0].content
 
 #pytest passa tre volte la funzione, una per ciascuna scelta di length
 #Questo test controlla in particolare che le istruzioni di lunghezza vengano correttamente
@@ -58,7 +58,7 @@ def test_user_text_does_not_leak_into_system() -> None:
 @pytest.mark.parametrize("length", list(LENGTH_INSTRUCTIONS.keys()))
 def test_length_levels_inject_correct_instruction(length: Length) -> None:
     msgs = build_summarize_messages("Testo di prova", length = length)
-    system_content = msgs[0]["content"]
+    system_content = msgs[0].content
 
     expectedInstruction = LENGTH_INSTRUCTIONS[length]
     assert expectedInstruction in system_content
@@ -79,8 +79,8 @@ def test_generate_returns_system_then_user_message() -> None:
     msgs = build_generate_messages("Scrivi un testo sul mare", "breve")
 
     assert len(msgs) == 2
-    assert msgs[0]["role"] == "system"
-    assert msgs[1]["role"] == "user"
+    assert msgs[0].role == "system"
+    assert msgs[1].role == "user"
 
 
 #Contenuto finto di una pagina, con dentro un'istruzione che il prompt deve
@@ -95,8 +95,8 @@ def test_generate_from_link_returns_system_then_user_message() -> None:
     msgs = build_generate_from_link_messages(PAGINA_ESTRATTA, "breve")
 
     assert len(msgs) == 2
-    assert msgs[0]["role"] == "system"
-    assert msgs[1]["role"] == "user"
+    assert msgs[0].role == "system"
+    assert msgs[1].role == "user"
 
 
 #Il cuore della #17: il contenuto della pagina e' il solo messaggio user, senza
@@ -106,22 +106,20 @@ def test_generate_from_link_returns_system_then_user_message() -> None:
 def test_generate_from_link_user_content_is_exactly_the_extracted_text() -> None:
     msgs = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")
 
-    assert msgs[1]["content"] == PAGINA_ESTRATTA
+    assert msgs[1].content == PAGINA_ESTRATTA
 
 
 def test_generate_from_link_extracted_text_does_not_leak_into_system() -> None:
     marker = "RISPOSTA_DI_TUTTO_42"
     msgs = build_generate_from_link_messages(f"{PAGINA_ESTRATTA} {marker}", "medio")
 
-    assert marker not in msgs[0]["content"]
+    assert marker not in msgs[0].content
 
 
 #L'istruzione di prodotto e' nel system, dove il provider la legge come propria
 #e non come parte del materiale da rielaborare.
 def test_generate_from_link_instruction_lives_in_the_system_prompt() -> None:
-    system_content = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0][
-        "content"
-    ]
+    system_content = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0].content
 
     assert "generare un testo originale" in system_content
     assert "italiano" in system_content
@@ -138,9 +136,7 @@ def test_system_prompt_declares_extracted_content_is_not_instructions() -> None:
     Il valore di questo test e' impedire che la mitigazione sparisca dal prompt
     senza che nessuno se ne accorga.
     """
-    system_content = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0][
-        "content"
-    ]
+    system_content = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0].content
 
     assert "non istruzioni da" in system_content
 
@@ -151,15 +147,15 @@ def test_generate_from_link_length_levels_inject_correct_instruction(
 ) -> None:
     msgs = build_generate_from_link_messages(PAGINA_ESTRATTA, length)
 
-    assert LENGTH_INSTRUCTIONS[length] in msgs[0]["content"]
+    assert LENGTH_INSTRUCTIONS[length] in msgs[0].content
 
 
 #Due template distinti, non uno riusato: l'input della generazione da link e'
 #materiale da rielaborare, quello della generazione e' un'istruzione da
 #eseguire, e le regole che ne discendono sono diverse.
 def test_generate_from_link_has_its_own_system_prompt() -> None:
-    da_link = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0]["content"]
-    diretta = build_generate_messages(PAGINA_ESTRATTA, "medio")[0]["content"]
+    da_link = build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0].content
+    diretta = build_generate_messages(PAGINA_ESTRATTA, "medio")[0].content
 
     assert da_link != diretta
 
@@ -174,9 +170,9 @@ def test_the_three_italian_prose_prompts_share_the_same_form_rules() -> None:
     che arriva al provider a dover coincidere.
     """
     da_link, diretta, riassunto = (
-        build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0]["content"],
-        build_generate_messages(PAGINA_ESTRATTA, "medio")[0]["content"],
-        build_summarize_messages(PAGINA_ESTRATTA, "medio")[0]["content"],
+        build_generate_from_link_messages(PAGINA_ESTRATTA, "medio")[0].content,
+        build_generate_messages(PAGINA_ESTRATTA, "medio")[0].content,
+        build_summarize_messages(PAGINA_ESTRATTA, "medio")[0].content,
     )
 
     code = [testo.split(FORM_HEADING)[1] for testo in (da_link, diretta, riassunto)]
