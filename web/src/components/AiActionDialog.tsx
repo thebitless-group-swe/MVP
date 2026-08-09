@@ -197,8 +197,59 @@ function HatSelector({
   )
 }
 
+function GenerateSourceTabs({
+  mode,
+  onChange,
+}: {
+  mode: 'prompt' | 'link'
+  onChange: (m: 'prompt' | 'link') => void
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Sorgente della generazione"
+      className="flex gap-1 rounded-md border border-border bg-muted p-1"
+    >
+      <button
+        type="button"
+        role="tab"
+        id="generate-tab-prompt"
+        aria-selected={mode === 'prompt'}
+        aria-controls="generate-panel-prompt"
+        onClick={() => onChange('prompt')}
+        className={cn(
+          'flex-1 rounded-sm px-3 py-1.5 text-sm transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          mode === 'prompt'
+            ? 'bg-background font-medium text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        Da prompt
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="generate-tab-link"
+        aria-selected={mode === 'link'}
+        aria-controls="generate-panel-link"
+        onClick={() => onChange('link')}
+        className={cn(
+          'flex-1 rounded-sm px-3 py-1.5 text-sm transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          mode === 'link'
+            ? 'bg-background font-medium text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        Da link
+      </button>
+    </div>
+  )
+}
 
-type LastCall = { input: string; params: AiParams }
+
+type LastCall = { input: string; params: AiParams; mode: 'prompt' | 'link' }
 
 export function AiActionDialog() {
   const actionId = useAiModal()
@@ -209,6 +260,7 @@ export function AiActionDialog() {
   const [input, setInput] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
   const [lastCall, setLastCall] = useState<LastCall | null>(null)
+  const [mode, setMode] = useState<'prompt' | 'link'>('prompt')
 
   const streamedOutput = useStreamedOutput()
   const isGenerating = useIsGenerating()
@@ -229,6 +281,7 @@ export function AiActionDialog() {
       setInput('')
       setValidationError(null)
       setLastCall(null)
+      setMode('prompt')
     }
   }, [actionId])
 
@@ -241,24 +294,40 @@ export function AiActionDialog() {
   const sameAsLast =
     lastCall !== null &&
     lastCall.input === currentInput &&
+    lastCall.mode === mode &&
     JSON.stringify(lastCall.params) === JSON.stringify(params)
+  const effectiveMinLength =
+    actionId === 'generate' && mode === 'link'
+      ? AI_ACTIONS['generate-link'].minLength
+      : action.minLength
+  const effectiveMaxLength =
+    actionId === 'generate' && mode === 'link'
+      ? AI_ACTIONS['generate-link'].maxLength
+      : action.maxLength
 
-  const inputTooShort = currentInput.length < action.minLength
+  const inputTooShort = currentInput.length < effectiveMinLength
   const inputTooLong =
-    action.maxLength !== null && currentInput.length > action.maxLength
+    effectiveMaxLength !== null && currentInput.length > effectiveMaxLength
 
+  const handleModeChange = (next: 'prompt' | 'link') => {
+    setMode(next)
+    setInput('')
+    setValidationError(null)
+  }
 
   const handleGenerate = () => {
     setValidationError(null)
     if (inputTooShort) {
       setValidationError(
-        `Servono almeno ${action.minLength} caratteri di testo.`,
+        actionId === 'generate' && mode === 'link'
+          ? 'Inserisci un URL.'
+          : `Servono almeno ${effectiveMinLength} caratteri di testo.`,
       )
       return
     }
     if (inputTooLong) {
       setValidationError(
-        `Il testo supera il massimo di ${action.maxLength} caratteri ` +
+        `Il testo supera il massimo di ${effectiveMaxLength} caratteri ` +
           `(attuali: ${currentInput.length}). Riducilo o elaboralo in più parti.`,
       )
       return
@@ -268,7 +337,7 @@ export function AiActionDialog() {
       return
     }
 
-   setLastCall({ input: currentInput, params: { ...params } })
+   setLastCall({ input: currentInput, params: { ...params }, mode })
   useEditorStore.setState({ streamedOutput: '', errorMessage: null })
 
   let streamFn: () => AsyncIterable<string>
@@ -289,7 +358,9 @@ export function AiActionDialog() {
       streamFn = () => api.critique(currentInput, params.hat!)
       break
     case 'generate':
-      streamFn = () => api.generate(currentInput, params.length ?? 'medio')
+      streamFn = mode === 'link'
+        ? () => api.generateFromLink(currentInput, params.length ?? 'medio')
+        : () => api.generate(currentInput, params.length ?? 'medio')
       break
     case 'generate-link':
       streamFn = () => api.generateFromLink(currentInput, params.length ?? 'medio')
@@ -319,6 +390,54 @@ export function AiActionDialog() {
 
 
   const renderInputSlot = () => {
+    if (actionId === 'generate') {
+      return (
+        <div className="flex flex-col gap-3">
+          <GenerateSourceTabs mode={mode} onChange={handleModeChange} />
+          {mode === 'prompt' ? (
+            <label
+              id="generate-panel-prompt"
+              role="tabpanel"
+              aria-labelledby="generate-tab-prompt"
+              className="flex flex-col gap-1.5"
+            >
+              <span className="text-sm font-medium text-foreground">
+                Istruzioni / Contesto
+              </span>
+              <textarea
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  setValidationError(null)
+                }}
+                rows={4}
+                placeholder="Descrivi cosa generare..."
+                className="min-h-[88px] rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+          ) : (
+            <label
+              id="generate-panel-link"
+              role="tabpanel"
+              aria-labelledby="generate-tab-link"
+              className="flex flex-col gap-1.5"
+            >
+              <span className="text-sm font-medium text-foreground">URL</span>
+              <input
+                type="url"
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  setValidationError(null)
+                }}
+                placeholder="https://..."
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+          )}
+        </div>
+      )
+    }
     if (action.source === 'prompt') {
       return (
         <label className="flex flex-col gap-1.5">
