@@ -63,6 +63,12 @@ class TestGenerateFromLinkErrors:
     def test_too_long_url_returns_400_with_readable_message(
         self, client: TestClient
     ) -> None:
+        #Unico test che fissa la mappatura 400. Dopo la #16.7 la rotta distingue
+        #i due fallimenti con `except InvalidLinkError` prima di
+        #`except FetchError`, e InvalidLinkError sottotipa FetchError: invertire
+        #i due except farebbe rispondere 503 qui, senza che nessun test unitario
+        #dello use case se ne accorga: quelli verificano il tipo sollevato dal
+        #servizio, non lo stato HTTP che la rotta ne deriva.
         #Sopra MAX_URL_LENGTH ma sotto il limite di HttpUrl (2083)
         prefix = "https://example.com/"
         long_url = prefix + "a" * (MAX_URL_LENGTH + 12 - len(prefix))
