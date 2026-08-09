@@ -17,6 +17,7 @@ beforeEach(() => {
     errorMessage: null,
     aiModal: null,
     _abortController: null,
+    _loadVersion: 0,
   })
 })
 
@@ -43,6 +44,51 @@ describe('useEditorStore', () => {
       result.current.reset()
     })
     expect(result.current.currentText).toBe('')
+  })
+})
+
+describe('useEditorStore — loadDocument', () => {
+  it('aggiorna currentText come setCurrentText', () => {
+    const { result } = renderHook(() => useEditorStore())
+    act(() => {
+      result.current.loadDocument('nota caricata')
+    })
+    expect(result.current.currentText).toBe('nota caricata')
+  })
+
+  it('incrementa _loadVersion a ogni caricamento con testo diverso', () => {
+    const { result } = renderHook(() => useEditorStore())
+    expect(result.current._loadVersion).toBe(0)
+    act(() => {
+      result.current.loadDocument('nota A')
+    })
+    expect(result.current._loadVersion).toBe(1)
+    act(() => {
+      result.current.loadDocument('nota B')
+    })
+    expect(result.current._loadVersion).toBe(2)
+  })
+
+  it('non incrementa _loadVersion se il testo è identico a quello corrente', () => {
+    const { result } = renderHook(() => useEditorStore())
+    act(() => {
+      result.current.loadDocument('stesso testo')
+    })
+    expect(result.current._loadVersion).toBe(1)
+    act(() => {
+      result.current.loadDocument('stesso testo')
+    })
+    // Senza questa guardia in loadDocument, Editor.tsx scambierebbe la
+    // prossima modifica reale per un caricamento (vedi #24, caso limite).
+    expect(result.current._loadVersion).toBe(1)
+  })
+
+  it('setCurrentText non tocca _loadVersion (percorso digitazione utente)', () => {
+    const { result } = renderHook(() => useEditorStore())
+    act(() => {
+      result.current.setCurrentText('digitato dall\'utente')
+    })
+    expect(result.current._loadVersion).toBe(0)
   })
 })
 

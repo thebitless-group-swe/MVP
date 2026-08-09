@@ -4,25 +4,34 @@ import { act, renderHook } from '@testing-library/react'
 import { useNotesStore, useNotesList, useCurrentNote } from '@/store/notes'
 import { useEditorStore } from '@/store/useEditorStore'
 
+// Creiamo i mock delle funzioni prima del mock del modulo
+const mockSetCurrentText = vi.fn()
+const mockLoadDocument = vi.fn()
+
 vi.mock('@/store/useEditorStore', () => ({
   useEditorStore: Object.assign(
     () => ({ currentText: '' }),
     {
       getState: vi.fn(() => ({
         currentText: 'testo editor',
-        setCurrentText: vi.fn(),
+        setCurrentText: mockSetCurrentText,
+        loadDocument: mockLoadDocument,
       })),
+      setState: vi.fn(),
+      subscribe: vi.fn(),
     }
   ),
 }))
 
-const mockSetCurrentText = vi.fn()
-
 beforeEach(() => {
   vi.clearAllMocks()
+  // Reimposta i mock per ogni test
+  mockSetCurrentText.mockClear()
+  mockLoadDocument.mockClear()
   ;(useEditorStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
     currentText: 'testo editor',
     setCurrentText: mockSetCurrentText,
+    loadDocument: mockLoadDocument,
   })
   useNotesStore.setState({ list: [], currentId: null })
 })
@@ -49,15 +58,20 @@ describe('useNotesStore — createEmpty', () => {
     expect(saved?.content).toBe('testo editor')
   })
 
-  it('imposta il testo editor a stringa vuota dopo la creazione', () => {
+  it('imposta il testo editor a stringa vuota dopo la creazione (usando loadDocument)', () => {
     const { result } = renderHook(() => useNotesStore())
     act(() => { result.current.createEmpty() })
-    expect(mockSetCurrentText).toHaveBeenCalledWith('')
+    // Ora il codice chiama loadDocument('') invece di setCurrentText('')
+    expect(mockLoadDocument).toHaveBeenCalledWith('')
+    // Verifica che loadDocument sia stato chiamato una volta
+    expect(mockLoadDocument).toHaveBeenCalledTimes(1)
+    // setCurrentText non deve essere chiamato
+    expect(mockSetCurrentText).not.toHaveBeenCalled()
   })
 })
 
 describe('useNotesStore — select', () => {
-  it('imposta currentId e sincronizza il testo editor', () => {
+  it('imposta currentId e sincronizza il testo editor (usando loadDocument)', () => {
     const noteA = { id: 'a', title: 'A', content: 'contenuto A', createdAt: 0, updatedAt: 0 }
     const noteB = { id: 'b', title: 'B', content: 'contenuto B', createdAt: 0, updatedAt: 0 }
     useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
@@ -66,10 +80,12 @@ describe('useNotesStore — select', () => {
     act(() => { result.current.select('b') })
 
     expect(result.current.currentId).toBe('b')
-    expect(mockSetCurrentText).toHaveBeenCalledWith('contenuto B')
+    // Ora select chiama loadDocument(note.content)
+    expect(mockLoadDocument).toHaveBeenCalledWith('contenuto B')
+    expect(mockSetCurrentText).not.toHaveBeenCalled()
   })
 
-  it('salva il contenuto editor sulla nota precedente prima di cambiare', () => {
+  it('salva il contenuto editor sulla nota precedente prima di cambiare (usa updateCurrent)', () => {
     const noteA = { id: 'a', title: 'A', content: '', createdAt: 0, updatedAt: 0 }
     const noteB = { id: 'b', title: 'B', content: '', createdAt: 0, updatedAt: 0 }
     useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
@@ -141,7 +157,7 @@ describe('useNotesStore — deleteNote', () => {
 })
 
 describe('useNotesStore — loadNote', () => {
-  it('aggiunge la nota se non esiste e la imposta come corrente', () => {
+  it('aggiunge la nota se non esiste e la imposta come corrente (usando loadDocument)', () => {
     const { result } = renderHook(() => useNotesStore())
     act(() => {
       result.current.loadNote({ id: 'x', title: 'X', content: 'ciao' })
@@ -149,7 +165,9 @@ describe('useNotesStore — loadNote', () => {
 
     expect(result.current.list).toHaveLength(1)
     expect(result.current.currentId).toBe('x')
-    expect(mockSetCurrentText).toHaveBeenCalledWith('ciao')
+    // Ora loadNote chiama loadDocument(note.content)
+    expect(mockLoadDocument).toHaveBeenCalledWith('ciao')
+    expect(mockSetCurrentText).not.toHaveBeenCalled()
   })
 
   it('aggiorna la nota se esiste già', () => {
@@ -163,6 +181,8 @@ describe('useNotesStore — loadNote', () => {
 
     expect(result.current.list).toHaveLength(1)
     expect(result.current.list[0].title).toBe('Nuovo')
+    // Anche in questo caso loadDocument viene chiamato con 'nuovo'
+    expect(mockLoadDocument).toHaveBeenCalledWith('nuovo')
   })
 })
 
