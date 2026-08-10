@@ -81,3 +81,15 @@ Due guardie impediscono di dimenticarsene:
 
 Senza queste guardie il frontend continuerebbe a compilare contro tipi stantii: `tsc`
 resta verde perché sta verificando il codice contro un contratto che non esiste più.
+
+### Architettura esagonale
+
+Il repository è organizzato secondo il pattern ports & adapters (`app.core/`,
+`app.infrastructure/`, `app.routes/`). Per impedire che le dipendenze vengano
+invertite, `import-linter` controlla i contratti definiti in `api/.importlinter`.
+
+Esegui il controllo in locale con:
+
+```bash
+cd api
+uv run import-linter lint
