@@ -3,17 +3,17 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from ..core.ports.content_extractor import ContentExtractor
-from ..core.ports.llm_client import LLMClient
-from ..core.services.generate_from_link import (
+from ...core.ports.content_extractor import ContentExtractor
+from ...core.ports.llm_client import LLMClient
+from ...core.services.generate_from_link import (
     FetchError,
     InvalidLinkError,
 )
-from ..core.services.generate_from_link import (
+from ...core.services.generate_from_link import (
     generate_from_link as generate_from_link_service,
 )
-from ..dependencies import get_content_extractor, get_llm_client
-from ..infrastructure.adapters.sse_streaming import sse_response
+from ...dependencies import get_content_extractor, get_llm_client
+from ...infrastructure.adapters.sse_streaming import sse_response
 from ..schemas import LinkRequest
 
 router = APIRouter(prefix="/api", tags=["generate-link"])

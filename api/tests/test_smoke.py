@@ -41,7 +41,7 @@ def test_generate_from_link_valid_url_returns_sse(
     client: TestClient,
     dummy_llm_client: DummyLLMClient,
 ) -> None:
-    #Prima serviva `@patch("app.routes.generate_link.TavilyExtractor")`: il test
+    #Prima serviva `@patch("app.api.routes.generate_link.TavilyExtractor")`: il test
     #doveva conoscere la classe concreta usata dalla rotta, e si rompeva appena
     #quella cambiava. Ora si sostituisce la porta, che e' il contratto vero.
     app.dependency_overrides[get_llm_client] = lambda: dummy_llm_client

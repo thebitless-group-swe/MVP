@@ -3,6 +3,7 @@ from typing import get_args
 
 import pytest
 
+from app.api.schemas import Hat, Language, Style
 from app.core.domain.prompts.rules import STYLE_INSTRUCTIONS
 from app.core.domain.prompts.templates import (
     CRITIQUE_FOCUS,
@@ -13,7 +14,6 @@ from app.core.domain.prompts.templates import (
     build_translate_messages,
 )
 from app.core.domain.values import NO_ERRORS_MARKER, Message
-from app.schemas import Hat, Language, Style
 
 TEST_TEXT = "Un testo abbastanza lungo da superare la validazione di schema."
 

@@ -12,13 +12,13 @@ forbidden_modules =
     tavily
     pydantic_settings
     app.infrastructure
-    app.routes
+    app.api
 
 [importlinter:contract:layers]
 name = Direzione delle dipendenze
 type = layers
 layers =
-    app.routes
+    app.api
     app.infrastructure
     app.core
 

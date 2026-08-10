@@ -48,7 +48,8 @@ jobs:
         with:
           name: coverage-api
           path: api/coverage.xml
-architettura:
+
+  architettura:
     name: Architettura (import-linter)
     runs-on: ubuntu-latest
     defaults:
@@ -70,7 +71,7 @@ architettura:
       - name: Controllo architettura (import-linter)
         run: uv run import-linter lint
 
-web:
+  web:
     name: Web (eslint + tsc + vitest + build)
     runs-on: ubuntu-latest
     defaults:

@@ -5,10 +5,10 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.api.schemas import LinkRequest
 from app.core.services.generate_from_link import MAX_URL_LENGTH
 from app.dependencies import get_llm_client
 from app.main import app
-from app.schemas import LinkRequest
 from app.settings import Settings
 from tests.conftest import DummyLLMClient
 

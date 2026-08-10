@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..core.domain.values import (
+from ...core.domain.values import (
     MAX_PROMPT_LENGTH,
     MAX_TEXT_LENGTH,
     MIN_PROMPT_LENGTH,

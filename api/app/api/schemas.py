@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, HttpUrl
 
-from .core.domain.values import (
+from ..core.domain.values import (
     MAX_PROMPT_LENGTH,
     MAX_TEXT_LENGTH,
     MIN_PROMPT_LENGTH,
