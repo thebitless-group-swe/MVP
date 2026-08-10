@@ -7,7 +7,7 @@ dell'analisi dei requisiti.
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import TextRequest
+from app.api.schemas import TextRequest
 
 
 class TestTextRequest:

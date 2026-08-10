@@ -21,6 +21,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.api.routes.generate_link import _FETCH_FAILED_DETAIL
 from app.core.ports.content_extractor import ContentExtractor
 from app.dependencies import (
     _CHIAVE_MANCANTE_DETAIL,
@@ -30,7 +31,6 @@ from app.dependencies import (
 )
 from app.infrastructure.adapters.tavily_extractor import TavilyExtractor
 from app.main import app
-from app.routes.generate_link import _FETCH_FAILED_DETAIL
 from tests.conftest import DummyLLMClient
 
 
@@ -209,7 +209,7 @@ class TestRottaConEstrazioneFallita:
         self, client: TestClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Lato server il dettaglio deve esserci tutto: e' li' che si debugga."""
-        with caplog.at_level(logging.ERROR, logger="app.routes.generate_link"):
+        with caplog.at_level(logging.ERROR, logger="app.api.routes.generate_link"):
             client.post(
                 "/api/generate-from-link", json={"url": "https://example.com"}
             )

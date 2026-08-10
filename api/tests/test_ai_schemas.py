@@ -6,10 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.core.ports.llm_client import LLMClient
-from app.dependencies import get_llm_client
-from app.main import app
-from app.schemas import (
+from app.api.schemas import (
     CritiqueRequest,
     GrammarRequest,
     Hat,
@@ -18,6 +15,9 @@ from app.schemas import (
     Style,
     TranslateRequest,
 )
+from app.core.ports.llm_client import LLMClient
+from app.dependencies import get_llm_client
+from app.main import app
 
 VALID_TEXT = "Un testo abbastanza lungo per superare la validazione di schema."
 SHORT_TEXT = "corto"

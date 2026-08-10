@@ -3,6 +3,7 @@ from typing import get_args
 
 import pytest
 
+from app.api.schemas import Hat, Language, Style
 from app.llm.prompts import (
     CRITIQUE_SYSTEM_PROMPTS,
     GRAMMAR_SYSTEM_PROMPT,
@@ -13,7 +14,6 @@ from app.llm.prompts import (
     build_rewrite_messages,
     build_translate_messages,
 )
-from app.schemas import Hat, Language, Style
 
 TEST_TEXT = "Un testo abbastanza lungo da superare la validazione di schema."
 

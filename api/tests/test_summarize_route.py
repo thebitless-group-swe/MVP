@@ -110,10 +110,10 @@ class _DisconnectedRequest:
 #non propaga correttamente il disconnect al server.
 @pytest.mark.asyncio
 async def test_disconnect_emits_log(caplog) -> None:
-    from app.routes.summarize import summarize
-    from app.schemas import TextRequest
+    from app.api.routes.summarize import summarize
+    from app.api.schemas import TextRequest
 
-    caplog.set_level(logging.INFO, logger="app.routes.summarize")
+    caplog.set_level(logging.INFO, logger="app.api.routes.summarize")
 
     response = await summarize(
         payload=TextRequest(text="Testo abbastanza lungo, Lorem Ipsum dolor sit amet"),
