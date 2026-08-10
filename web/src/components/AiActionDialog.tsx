@@ -1,14 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Dialog } from 'radix-ui'
-
-import { MarkdownView } from '@/components/MarkdownView'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { useTypewriter } from '@/hooks/useTypewriter'
-import { useAiStream } from '@/hooks/useAiStream'
-import { AI_ACTIONS, getActiveText, type AiParams } from '@/lib/aiActions'
-import { cn } from '@/lib/utils'
-import type { Length, Language, Style, Hat } from '@/types/models'
 import {
   useAiModal,
   useEditorStore,
@@ -17,6 +8,15 @@ import {
   useStreamedOutput,
   type AiActionId,
 } from '@/store/useEditorStore'
+import { MarkdownView } from '@/components/MarkdownView'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { useTypewriter } from '@/hooks/useTypewriter'
+import { useAiStream } from '@/hooks/useAiStream'
+import { api } from '@/lib/api'
+import { AI_ACTIONS, getActiveText, type AiParams } from '@/lib/aiActions'
+import { cn } from '@/lib/utils'
+import type { Length, Language, Style, Hat } from '@/types/models'
 import { NO_ERRORS_MARKER } from '@/types/models'
 
 
@@ -264,14 +264,41 @@ export function AiActionDialog() {
       return
     }
     if (actionId === 'critique' && !params.hat) {
-      setValidationError('Seleziona un cappello per l analisi.')
+      setValidationError('Seleziona un cappello per l\'analisi.')
       return
     }
 
-    const body = action.buildBody(params, currentInput)
-    setLastCall({ input: currentInput, params: { ...params } })
-    useEditorStore.setState({ streamedOutput: '', errorMessage: null })
-    void start({ endpoint: action.endpoint, body })
+   setLastCall({ input: currentInput, params: { ...params } })
+  useEditorStore.setState({ streamedOutput: '', errorMessage: null })
+
+  let streamFn: () => AsyncIterable<string>
+  switch (actionId) {
+    case 'summarize':
+      streamFn = () => api.summarize(currentInput, params.length ?? 'medio')
+      break
+    case 'translate':
+      streamFn = () => api.translate(currentInput, params.target_language ?? LANGUAGES[0].value)
+      break
+    case 'rewrite':
+      streamFn = () => api.rewrite(currentInput, params.style ?? STYLES[0].value)
+      break
+    case 'grammar':
+      streamFn = () => api.grammar(currentInput)
+      break
+    case 'critique':
+      streamFn = () => api.critique(currentInput, params.hat!)
+      break
+    case 'generate':
+      streamFn = () => api.generate(currentInput, params.length ?? 'medio')
+      break
+    case 'generate-link':
+      streamFn = () => api.generateFromLink(currentInput, params.length ?? 'medio')
+      break
+    default:
+      return
+  }
+
+  void start(streamFn)
   }
 
   const handleAccept = () => {

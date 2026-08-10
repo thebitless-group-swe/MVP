@@ -1,94 +1,73 @@
 import { useCallback, useRef, useState } from 'react'
 import { useEditorStore } from '@/store/useEditorStore'
-import { parseSseStream } from '@/lib/sse'
 
 export type AiStreamStatus = 'idle' | 'streaming' | 'done' | 'error'
 
-export type AiStreamParams = {
-  endpoint: string
-  body: Record<string, unknown>
-}
-
 export type AiStreamHandle = {
-  start: (params: AiStreamParams) => Promise<void>
+  start: <T>(fn: () => AsyncIterable<T>) => Promise<void>
   abort: () => void
   status: AiStreamStatus
 }
 
 export function useAiStream(): AiStreamHandle {
   const [status, setStatus] = useState<AiStreamStatus>('idle')
-  const controllerRef = useRef<AbortController | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const isAbortedRef = useRef(false)
 
   const abort = useCallback(() => {
-    controllerRef.current?.abort()
-    controllerRef.current = null
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    isAbortedRef.current = true
     setStatus('idle')
+    useEditorStore.getState()._setAbortController(null)
+    useEditorStore.getState().finishStreaming()
   }, [])
 
-  const start = useCallback(async ({ endpoint, body }: AiStreamParams) => {
-    // Annulla eventuale stream precedente prima di iniziarne uno nuovo
-    controllerRef.current?.abort()
+  const start = useCallback(
+    async <T>(fn: () => AsyncIterable<T>): Promise<void> => {
+      abortControllerRef.current?.abort()
 
-    const controller = new AbortController()
-    controllerRef.current = controller
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+      isAbortedRef.current = false
 
-    // Registra il controller nello store: TopBar può abortire qualunque stream
-    useEditorStore.getState()._setAbortController(controller)
+      useEditorStore.getState()._setAbortController(controller)
+      setStatus('streaming')
+      useEditorStore.getState().startStreaming()
 
-    setStatus('streaming')
-    useEditorStore.getState().startStreaming()
-
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-
-      if (!response.ok) {
-        const resBody = await response.json().catch(() => null)
-        useEditorStore.getState().setError(resBody?.detail ?? `Errore ${response.status}`)
-        setStatus('error')
-        return
-      }
-
-      const reader = response.body!.getReader()
-
-      // Il fallimento a meta' stream non e' piu' desumibile dalla chiusura:
-      // parseSseStream lo dichiara con un evento dedicato. Su quel percorso si
-      // chiama setError e NON finishStreaming, altrimenti un testo troncato
-      // verrebbe presentato come completo (R-80-F-Ob, R-110-F-Ob, UC72).
-      let failed = false
-      for await (const event of parseSseStream(reader)) {
-        if (controller.signal.aborted) break
-        if (event.type === 'error') {
-          failed = true
-          useEditorStore.getState().setError(event.message)
-          break
+      try {
+        for await (const chunk of fn()) {
+          if (controller.signal.aborted) {
+            isAbortedRef.current = true
+            break
+          }
+          useEditorStore.getState().appendChunk(String(chunk))
         }
-        useEditorStore.getState().appendChunk(event.data)
-      }
 
-      if (failed) {
-        setStatus('error')
-        return
-      }
+        if (isAbortedRef.current) {
+          setStatus('idle')
+          useEditorStore.getState().finishStreaming()
+          return
+        }
 
-      setStatus('done')
-      useEditorStore.getState().finishStreaming()
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+        setStatus('done')
         useEditorStore.getState().finishStreaming()
-        setStatus('idle')
-        return
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          setStatus('idle')
+          useEditorStore.getState().finishStreaming()
+          return
+        }
+        const msg = error instanceof Error ? error.message : 'Errore sconosciuto'
+        useEditorStore.getState().setError(msg)
+        setStatus('error')
+      } finally {
+        useEditorStore.getState()._setAbortController(null)
+        abortControllerRef.current = null
       }
-      useEditorStore.getState().setError('Errore di connessione')
-      setStatus('error')
-    } finally {
-      useEditorStore.getState()._setAbortController(null)
-    }
-  }, [])
+    },
+    []
+  )
 
   return { start, abort, status }
 }

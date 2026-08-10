@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiActionDialog } from '@/components/AiActionDialog'
+import { api } from '@/lib/api'
 import { useEditorStore } from '@/store/useEditorStore'
 import {
   MAX_PROMPT_LENGTH,
@@ -12,21 +13,26 @@ import {
 import { AI_ACTIONS } from '@/lib/aiActions'
 
 // Hoisted: i mock devono essere pronti prima che vi.mock li usi
-const { mockStart, mockAbort } = vi.hoisted(() => ({
-  mockStart: vi.fn().mockResolvedValue(undefined),
+const { mockStart, mockAbort, capturedFn } = vi.hoisted(() => ({
+  mockStart: vi.fn().mockImplementation(async (fn) => {
+    // Salva la funzione per poterla ispezionare dopo
+    capturedFn.value = fn
+  }),
   mockAbort: vi.fn(),
+  capturedFn: { value: null as (() => AsyncIterable<string>) | null },
 }))
 
+// Mock di useAiStream con la nuova firma
 vi.mock('@/hooks/useAiStream', () => ({
   useAiStream: () => ({ start: mockStart, abort: mockAbort, status: 'idle' }),
 }))
 
-// useTypewriter restituisce il testo direttamente: niente RAF in jsdom
+// Mock di useTypewriter
 vi.mock('@/hooks/useTypewriter', () => ({
   useTypewriter: (text: string) => text,
 }))
 
-// getActiveText: testo lungo abbastanza per summarize (minLength 10)
+// Mock di aiActions: getActiveText restituisce un testo lungo
 vi.mock('@/lib/aiActions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/aiActions')>()
   return { ...actual, getActiveText: vi.fn(() => ACTIVE_TEXT) }
@@ -34,11 +40,26 @@ vi.mock('@/lib/aiActions', async (importOriginal) => {
 
 import { getActiveText } from '@/lib/aiActions'
 
+// Mock della Facade api
+vi.mock('@/lib/api', () => ({
+  api: {
+    summarize: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
+    translate: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
+    rewrite: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
+    grammar: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
+    critique: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
+    generate: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
+    generateFromLink: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
+  }
+}))
+
 const ACTIVE_TEXT = 'testo di esempio abbastanza lungo per il test'
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getActiveText).mockReturnValue(ACTIVE_TEXT)
+  // Reset captured function
+  capturedFn.value = null
   useEditorStore.setState({
     currentText: 'testo originale',
     selectedText: '',
@@ -70,19 +91,23 @@ describe('AiActionDialog — parametri di default', () => {
 })
 
 describe('AiActionDialog — body corretto', () => {
-  it('summarize: invia text e length dal registry', async () => {
+  it('summarize: invia text e length tramite Facade', async () => {
     act(() => { useEditorStore.getState().setAiModal('summarize') })
     render(<AiActionDialog />)
 
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).toHaveBeenCalledWith({
-      endpoint: expect.stringContaining('/api/summarize'),
-      body: { text: ACTIVE_TEXT, length: 'medio' },
-    })
+    // Verifica che start sia chiamato con una funzione
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    const fn = mockStart.mock.calls[0][0]
+    expect(fn).toBeInstanceOf(Function)
+
+    // Esegui la funzione per verificare che chiami la Facade corretta
+    await fn()
+    expect(api.summarize).toHaveBeenCalledWith(ACTIVE_TEXT, 'medio')
   })
 
-  it('generate: invia prompt e length', async () => {
+  it('generate: invia prompt e length tramite Facade', async () => {
     act(() => { useEditorStore.getState().setAiModal('generate') })
     render(<AiActionDialog />)
 
@@ -92,10 +117,10 @@ describe('AiActionDialog — body corretto', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).toHaveBeenCalledWith({
-      endpoint: expect.stringContaining('/api/generate'),
-      body: { prompt: 'Scrivi un articolo sulla Luna', length: 'medio' },
-    })
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    const fn = mockStart.mock.calls[0][0]
+    await fn()
+    expect(api.generate).toHaveBeenCalledWith('Scrivi un articolo sulla Luna', 'medio')
   })
 })
 
@@ -177,22 +202,25 @@ describe('AiActionDialog — Rifiuta', () => {
 })
 
 describe('AiActionDialog — testo insufficiente (R-81)', () => {
-  it('generate: nessuna fetch con prompt troppo corto, mostra alert', async () => {
+  it('generate: il prompt oltre il massimo non parte', async () => {
     act(() => { useEditorStore.getState().setAiModal('generate') })
     render(<AiActionDialog />)
 
-    // Meno di 3 caratteri (minLength per generate)
-    await userEvent.type(screen.getByRole('textbox'), 'ab')
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'x'.repeat(MAX_PROMPT_LENGTH + 1) },
+    })
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
     expect(mockStart).not.toHaveBeenCalled()
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        `massimo di ${MAX_PROMPT_LENGTH} caratteri`
+      )
     })
   })
 
   it('summarize: nessuna fetch con testo dell editor troppo corto', async () => {
-    vi.mocked(getActiveText).mockReturnValue('corto') // < 10 caratteri
+    vi.mocked(getActiveText).mockReturnValue('corto')
 
     act(() => { useEditorStore.getState().setAiModal('summarize') })
     render(<AiActionDialog />)
@@ -206,7 +234,6 @@ describe('AiActionDialog — testo insufficiente (R-81)', () => {
   })
 })
 
-describe('AiActionDialog — testo oltre il massimo', () => {
   it('summarize: nessuna fetch, e l alert dice quanto e il massimo', async () => {
     vi.mocked(getActiveText).mockReturnValue('x'.repeat(MAX_TEXT_LENGTH + 1))
 
@@ -217,9 +244,11 @@ describe('AiActionDialog — testo oltre il massimo', () => {
 
     expect(mockStart).not.toHaveBeenCalled()
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(String(MAX_TEXT_LENGTH))
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        `massimo di ${MAX_TEXT_LENGTH} caratteri`
+      )
+      })
     })
-  })
 
   it('summarize: il testo esattamente al massimo passa', async () => {
     const alLimite = 'x'.repeat(MAX_TEXT_LENGTH)
@@ -229,11 +258,10 @@ describe('AiActionDialog — testo oltre il massimo', () => {
     render(<AiActionDialog />)
 
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
-
-    expect(mockStart).toHaveBeenCalledWith({
-      endpoint: expect.stringContaining('/api/summarize'),
-      body: { text: alLimite, length: 'medio' },
-    })
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    const fn = mockStart.mock.calls[0][0]
+    await fn()
+    expect(api.summarize).toHaveBeenCalledWith(alLimite, 'medio')
   })
 
   it('generate: il prompt oltre il massimo non parte', async () => {
@@ -250,7 +278,6 @@ describe('AiActionDialog — testo oltre il massimo', () => {
       expect(screen.getByRole('alert')).toHaveTextContent(String(MAX_PROMPT_LENGTH))
     })
   })
-})
 
 describe('AiActionDialog — lingue di destinazione (R-58-F-Ob)', () => {
   it('mostra esattamente le quattro lingue dell AdR', () => {
@@ -264,10 +291,6 @@ describe('AiActionDialog — lingue di destinazione (R-58-F-Ob)', () => {
     expect(screen.getByRole('radio', { name: 'Spagnolo' })).toBeInTheDocument()
   })
 
-  // UC63.1 elenca quattro lingue di destinazione e l'italiano non e' fra
-  // queste. Prima di #02 questo test asseriva la presenza di «Italiano»:
-  // certificava un'opzione fuori specifica, il cui valore ('it') era anche il
-  // default inviato al backend e rifiutato con 422.
   it('non offre l italiano come lingua di destinazione', () => {
     act(() => { useEditorStore.getState().setAiModal('translate') })
     render(<AiActionDialog />)
@@ -282,10 +305,10 @@ describe('AiActionDialog — lingue di destinazione (R-58-F-Ob)', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Inglese' }))
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).toHaveBeenCalledWith({
-      endpoint: expect.stringContaining('/api/translate'),
-      body: { text: ACTIVE_TEXT, target_language: 'inglese' },
-    })
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    const fn = mockStart.mock.calls[0][0]
+    await fn()
+    expect(api.translate).toHaveBeenCalledWith(ACTIVE_TEXT, 'inglese')
   })
 })
 
@@ -307,10 +330,10 @@ describe('AiActionDialog — stili di riscrittura (R-60-F-Ob)', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Accademico' }))
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).toHaveBeenCalledWith({
-      endpoint: expect.stringContaining('/api/rewrite'),
-      body: { text: ACTIVE_TEXT, style: 'accademico' },
-    })
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    const fn = mockStart.mock.calls[0][0]
+    await fn()
+    expect(api.rewrite).toHaveBeenCalledWith(ACTIVE_TEXT, 'accademico')
   })
 })
 
@@ -361,9 +384,6 @@ describe('AiActionDialog — critique (cappelli)', () => {
     radios.forEach((r) => expect(r).toHaveAttribute('aria-checked', 'false'))
   })
 
-  // L'etichetta e' di interfaccia («Critico»), il valore e' di contratto
-  // («nero»): e' la mappatura che #02 corregge, quindi va asserita sul valore
-  // esatto e non su expect.any(String), che passava anche con 'black'.
   it.each([
     ['informativo', 'bianco'],
     ['emotivo', 'rosso'],
@@ -378,10 +398,10 @@ describe('AiActionDialog — critique (cappelli)', () => {
     await userEvent.click(screen.getByRole('radio', { name: new RegExp(etichetta, 'i') }))
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).toHaveBeenCalledWith({
-      endpoint: expect.stringContaining('/api/critique'),
-      body: { text: ACTIVE_TEXT, hat: valore },
-    })
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    const fn = mockStart.mock.calls[0][0]
+    await fn()
+    expect(api.critique).toHaveBeenCalledWith(ACTIVE_TEXT, valore)
   })
 
   it('senza cappello → nessuna fetch, mostra alert', async () => {
