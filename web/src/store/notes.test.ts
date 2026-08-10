@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useNotesStore, useNotesList, useCurrentNote } from '@/store/notes'
 import { useEditorStore } from '@/store/useEditorStore'
@@ -22,6 +22,21 @@ vi.mock('@/store/useEditorStore', () => ({
     }
   ),
 }))
+
+afterEach(() => {
+  // Alcuni test tolgono `crypto.randomUUID` per esercitare il contesto non
+  // sicuro, altri fanno fallire `localStorage`: senza questo, stub e spy
+  // resterebbero attivi per i test successivi.
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+/** Simula un `localStorage` pieno: e' il modo realistico in cui `set` fallisce. */
+function persistenzaRotta() {
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new DOMException('quota superata', 'QuotaExceededError')
+  })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -56,6 +71,58 @@ describe('useNotesStore — createEmpty', () => {
 
     const saved = result.current.list.find((n) => n.id === 'a')
     expect(saved?.content).toBe('testo editor')
+  })
+
+  it('crea la nota anche fuori da secure context, dove randomUUID non esiste', () => {
+    // R-82-F-Ob su HTTP non-localhost: `crypto.randomUUID` e' definita **solo
+    // in secure context**, e `createEmpty` la chiamava diretta. Li' non
+    // mancava la gestione dell'errore: la creazione si rompeva del tutto.
+    const cryptoReale = globalThis.crypto
+    vi.stubGlobal('crypto', {
+      getRandomValues: (arr: Uint8Array<ArrayBuffer>) => cryptoReale.getRandomValues(arr),
+    })
+
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty() })
+
+    expect(result.current.list).toHaveLength(1)
+    expect(result.current.list[0].id).toBeTruthy()
+    expect(result.current.currentId).toBe(result.current.list[0].id)
+  })
+
+  /*
+   * UC75 post-condizione: «Il sistema ripristina lo stato precedente per
+   * evitare perdite di dati». Senza il ripristino l'utente vedrebbe insieme il
+   * messaggio d'errore e la nota comparire nell'elenco — misurato: il
+   * QuotaExceededError propaga da `set` **dopo** che lo stato in memoria e'
+   * gia' cambiato.
+   */
+  /*
+   * Nota sulle asserzioni: si legge `useNotesStore.getState()` e non
+   * `result.current`. Quando l'eccezione interrompe l'`act` il componente non
+   * si ri-renderizza, quindi `result.current` resta lo snapshot precedente e
+   * l'asserzione passerebbe **anche senza ripristino**. Verificato per
+   * mutazione: con `result.current` la rimozione del ripristino non veniva
+   * intercettata da nessun test.
+   */
+  it('persistenza fallita senza nota corrente → nessuna nota resta nell elenco', () => {
+    persistenzaRotta()
+
+    expect(() => useNotesStore.getState().createEmpty()).toThrow()
+
+    expect(useNotesStore.getState().list).toHaveLength(0)
+    expect(useNotesStore.getState().currentId).toBeNull()
+  })
+
+  it('persistenza fallita con nota corrente → la nota precedente resta intatta', () => {
+    const precedente = { id: 'a', title: 'A', content: 'contenuto', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [precedente], currentId: 'a' })
+    persistenzaRotta()
+
+    expect(() => useNotesStore.getState().createEmpty()).toThrow()
+
+    expect(useNotesStore.getState().list).toEqual([precedente])
+    expect(useNotesStore.getState().currentId).toBe('a')
   })
 
   it('imposta il testo editor a stringa vuota dopo la creazione (usando loadDocument)', () => {
