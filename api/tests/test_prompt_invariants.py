@@ -125,11 +125,6 @@ class TestStrutturaDelRisultato:
         assert msgs[0].role == "system"
         assert msgs[1].role == "user"
 
-    def test_il_messaggio_utente_e_esattamente_il_testo_ricevuto(
-        self, nome: str, build: Callable[[str], list[Message]]
-    ) -> None:
-        assert _user(build(TESTO)) == TESTO
-
     def test_il_testo_utente_non_finisce_nel_system_prompt(
         self, nome: str, build: Callable[[str], list[Message]]
     ) -> None:
@@ -139,6 +134,36 @@ class TestStrutturaDelRisultato:
         marcatore = "RISPOSTA_DI_TUTTO_42"
 
         assert marcatore not in _system(build(f"{TESTO} {marcatore}"))
+
+
+#`generate_from_link` e' escluso da qui, ed e' l'unica esclusione di questo
+#file. Dalla #34 il suo messaggio utente non e' piu' il testo ricevuto ma il
+#testo racchiuso fra i delimitatori, quindi l'uguaglianza qui sotto e' falsa per
+#costruzione — non una regressione da correggere.
+#
+#**La copertura non e' stata tolta, e' stata spostata.** La proposizione
+#equivalente per quel builder e'
+#`test_prompts.py::test_generate_from_link_user_content_is_exactly_the_wrapped_extracted_text`,
+#che asserisce l'uguaglianza esatta col testo avvolto: sempre un'uguaglianza e
+#non un contenimento, cosi' continua a provare che davanti al contenuto non ci
+#sia altro. Vive li' perche' li' stanno gli altri test di quel builder.
+#
+#Il test sta fuori dalla classe qui sopra perche' la parametrizzazione e' di
+#classe: e' l'unico dei tre a non valere per tutti i builder.
+CASI_TESTO_UTENTE_INTATTO = [
+    (nome, build) for nome, build in CASI if not nome.startswith("generate_from_link/")
+]
+
+
+@pytest.mark.parametrize(
+    ("nome", "build"),
+    CASI_TESTO_UTENTE_INTATTO,
+    ids=[nome for nome, _ in CASI_TESTO_UTENTE_INTATTO],
+)
+def test_il_messaggio_utente_e_esattamente_il_testo_ricevuto(
+    nome: str, build: Callable[[str], list[Message]]
+) -> None:
+    assert _user(build(TESTO)) == TESTO
 
 
 @pytest.mark.parametrize(("nome", "build"), CASI, ids=IDS)
