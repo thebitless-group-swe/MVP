@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   api:
@@ -48,6 +48,28 @@ jobs:
         with:
           name: coverage-api
           path: api/coverage.xml
+
+  architettura:
+    name: Architettura (import-linter)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installa uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: api/uv.lock
+
+      - name: Installa le dipendenze
+        run: uv sync --frozen
+
+      - name: Controllo architettura (import-linter)
+        run: uv run import-linter lint
 
   web:
     name: Web (eslint + tsc + vitest + build)

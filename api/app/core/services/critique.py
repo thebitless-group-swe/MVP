@@ -4,7 +4,7 @@ Forma e convenzioni sono quelle fissate dal pilota in summarize.py.
 """
 from collections.abc import AsyncIterator
 
-from ...llm.prompts import build_critique_messages
+from ..domain.prompts.templates import build_critique_messages
 from ..domain.values import Hat
 from ..ports.llm_client import LLMClient
 

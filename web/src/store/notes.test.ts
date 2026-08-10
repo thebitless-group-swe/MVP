@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useNotesStore, useNotesList, useCurrentNote } from '@/store/notes'
 import { useEditorStore } from '@/store/useEditorStore'
@@ -23,6 +23,21 @@ vi.mock('@/store/useEditorStore', () => ({
   ),
 }))
 
+afterEach(() => {
+  // Alcuni test tolgono `crypto.randomUUID` per esercitare il contesto non
+  // sicuro, altri fanno fallire `localStorage`: senza questo, stub e spy
+  // resterebbero attivi per i test successivi.
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+/** Simula un `localStorage` pieno: e' il modo realistico in cui `set` fallisce. */
+function persistenzaRotta() {
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new DOMException('quota superata', 'QuotaExceededError')
+  })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   // Reimposta i mock per ogni test
@@ -36,15 +51,45 @@ beforeEach(() => {
   useNotesStore.setState({ list: [], currentId: null })
 })
 
+/*
+ * R-114-F-Ob (UC74.3) — il titolo lo fornisce l'utente.
+ *
+ * L'asserzione `expect(title).toBe('Senza titolo')` che stava qui non
+ * verificava un comportamento: ratificava il difetto, cioe' il titolo
+ * assegnato d'ufficio. Per questo e' stata riscritta e non adattata. Il
+ * valore di ripiego sopravvive in un test solo, quello che ne descrive
+ * l'unica occasione legittima: la stringa vuota.
+ */
 describe('useNotesStore — createEmpty', () => {
-  it('crea una nota vuota e la imposta come corrente', () => {
+  it('crea la nota con il titolo indicato dall utente', () => {
     const { result } = renderHook(() => useNotesStore())
-    act(() => { result.current.createEmpty() })
+    act(() => { result.current.createEmpty('Appunti di algebra') })
 
     expect(result.current.list).toHaveLength(1)
     expect(result.current.currentId).toBe(result.current.list[0].id)
-    expect(result.current.list[0].title).toBe('Senza titolo')
+    expect(result.current.list[0].title).toBe('Appunti di algebra')
     expect(result.current.list[0].content).toBe('')
+  })
+
+  it('un titolo vuoto ricade su "Senza titolo"', () => {
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty('') })
+
+    expect(result.current.list[0].title).toBe('Senza titolo')
+  })
+
+  it('un titolo di soli spazi ricade su "Senza titolo"', () => {
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty('   ') })
+
+    expect(result.current.list[0].title).toBe('Senza titolo')
+  })
+
+  it('scarta gli spazi ai bordi del titolo', () => {
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty('  Bozza capitolo 3  ') })
+
+    expect(result.current.list[0].title).toBe('Bozza capitolo 3')
   })
 
   it('salva il contenuto editor sulla nota corrente prima di creare', () => {
@@ -52,15 +97,67 @@ describe('useNotesStore — createEmpty', () => {
     useNotesStore.setState({ list: [existingNote], currentId: 'a' })
 
     const { result } = renderHook(() => useNotesStore())
-    act(() => { result.current.createEmpty() })
+    act(() => { result.current.createEmpty('Nuova') })
 
     const saved = result.current.list.find((n) => n.id === 'a')
     expect(saved?.content).toBe('testo editor')
   })
 
-  it('imposta il testo editor a stringa vuota dopo la creazione (usando loadDocument)', () => {
+  it('crea la nota anche fuori da secure context, dove randomUUID non esiste', () => {
+    // R-82-F-Ob su HTTP non-localhost: `crypto.randomUUID` e' definita **solo
+    // in secure context**, e `createEmpty` la chiamava diretta. Li' non
+    // mancava la gestione dell'errore: la creazione si rompeva del tutto.
+    const cryptoReale = globalThis.crypto
+    vi.stubGlobal('crypto', {
+      getRandomValues: (arr: Uint8Array<ArrayBuffer>) => cryptoReale.getRandomValues(arr),
+    })
+
     const { result } = renderHook(() => useNotesStore())
     act(() => { result.current.createEmpty() })
+
+    expect(result.current.list).toHaveLength(1)
+    expect(result.current.list[0].id).toBeTruthy()
+    expect(result.current.currentId).toBe(result.current.list[0].id)
+  })
+
+  /*
+   * UC75 post-condizione: «Il sistema ripristina lo stato precedente per
+   * evitare perdite di dati». Senza il ripristino l'utente vedrebbe insieme il
+   * messaggio d'errore e la nota comparire nell'elenco — misurato: il
+   * QuotaExceededError propaga da `set` **dopo** che lo stato in memoria e'
+   * gia' cambiato.
+   */
+  /*
+   * Nota sulle asserzioni: si legge `useNotesStore.getState()` e non
+   * `result.current`. Quando l'eccezione interrompe l'`act` il componente non
+   * si ri-renderizza, quindi `result.current` resta lo snapshot precedente e
+   * l'asserzione passerebbe **anche senza ripristino**. Verificato per
+   * mutazione: con `result.current` la rimozione del ripristino non veniva
+   * intercettata da nessun test.
+   */
+  it('persistenza fallita senza nota corrente → nessuna nota resta nell elenco', () => {
+    persistenzaRotta()
+
+    expect(() => useNotesStore.getState().createEmpty()).toThrow()
+
+    expect(useNotesStore.getState().list).toHaveLength(0)
+    expect(useNotesStore.getState().currentId).toBeNull()
+  })
+
+  it('persistenza fallita con nota corrente → la nota precedente resta intatta', () => {
+    const precedente = { id: 'a', title: 'A', content: 'contenuto', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [precedente], currentId: 'a' })
+    persistenzaRotta()
+
+    expect(() => useNotesStore.getState().createEmpty()).toThrow()
+
+    expect(useNotesStore.getState().list).toEqual([precedente])
+    expect(useNotesStore.getState().currentId).toBe('a')
+  })
+
+  it('imposta il testo editor a stringa vuota dopo la creazione (usando loadDocument)', () => {
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty('Nuova') })
     // Ora il codice chiama loadDocument('') invece di setCurrentText('')
     expect(mockLoadDocument).toHaveBeenCalledWith('')
     // Verifica che loadDocument sia stato chiamato una volta
@@ -153,6 +250,74 @@ describe('useNotesStore — deleteNote', () => {
 
     expect(result.current.currentId).toBeNull()
     expect(result.current.list).toHaveLength(0)
+  })
+
+  /*
+   * I tre test qui sopra guardano lista e `currentId`, mai l'editor — ed e' il
+   * motivo per cui il difetto seguente e' sopravvissuto finche' nessun punto
+   * della UI raggiungeva `deleteNote`.
+   *
+   * Misurato prima della correzione: eliminando la nota corrente, il suo testo
+   * restava nell'editor mentre `currentId` passava a un'altra nota. Al primo
+   * cambio nota quel testo veniva salvato **sopra** la nota di destinazione:
+   * eliminando A (contenuto 'AAA') e poi selezionando B, il contenuto di B
+   * diventava 'AAA'. Perdita di dati silenziosa.
+   */
+  it('eliminando la nota corrente, l editor carica quella che subentra', () => {
+    const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
+
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.deleteNote('a') })
+
+    expect(mockLoadDocument).toHaveBeenCalledWith('BBB')
+  })
+
+  it('eliminando l ultima nota, l editor si svuota', () => {
+    const note = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [note], currentId: 'a' })
+
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.deleteNote('a') })
+
+    expect(mockLoadDocument).toHaveBeenCalledWith('')
+  })
+
+  it('eliminando una nota NON corrente, l editor non viene toccato', () => {
+    // Il documento aperto non c'entra nulla con la nota rimossa: ricaricarlo
+    // sarebbe un salto visibile e ingiustificato.
+    const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
+
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.deleteNote('b') })
+
+    expect(result.current.currentId).toBe('a')
+    expect(mockLoadDocument).not.toHaveBeenCalled()
+  })
+
+  /*
+   * UC81, post-condizioni: «L'integrita' del dato viene preservata. La nota
+   * non viene eliminata. L'utente riceve un feedback sull'errore». Le prime
+   * due si verificano qui, la terza in `Sidebar.test.tsx`.
+   *
+   * Le asserzioni leggono `useNotesStore.getState()` e non `result.current`:
+   * quando l'eccezione interrompe l'`act` il componente non si ri-renderizza,
+   * quindi `result.current` resterebbe lo snapshot precedente e il test
+   * passerebbe anche senza ripristino.
+   */
+  it('persistenza fallita → la nota NON viene eliminata e l errore propaga', () => {
+    const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
+    persistenzaRotta()
+
+    expect(() => useNotesStore.getState().deleteNote('a')).toThrow()
+
+    expect(useNotesStore.getState().list).toEqual([noteA, noteB])
+    expect(useNotesStore.getState().currentId).toBe('a')
   })
 })
 

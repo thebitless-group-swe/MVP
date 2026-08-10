@@ -19,9 +19,10 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+from app.core.domain.prompts.rules import LENGTH_INSTRUCTIONS
+from app.core.domain.prompts.templates import build_summarize_messages
 from app.core.domain.values import Length
 from app.core.services.summarize import summarize
-from app.llm.prompts import LENGTH_INSTRUCTIONS, build_summarize_messages
 from tests.conftest import DummyLLMClient
 
 TEXT = "Un testo abbastanza lungo da poter essere riassunto. Lorem ipsum dolor sit amet."

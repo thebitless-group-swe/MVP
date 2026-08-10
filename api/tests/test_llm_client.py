@@ -11,6 +11,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 
+from app.core.domain.values import Message
 from app.core.ports.llm_client import LLMProviderError
 from app.infrastructure.adapters.litellm_client import (
     HTTP_TIMEOUT_SECONDS,
@@ -18,7 +19,11 @@ from app.infrastructure.adapters.litellm_client import (
 )
 from app.settings import Settings
 
-MESSAGES = [{"role": "user", "content": "Riassumi questo testo."}]
+#Il dominio parla di Message: la forma a dizionario compare solo nel
+#payload che l'adattatore costruisce, ed e' quella che
+#test_stream_invia_payload_corretto verifica.
+MESSAGES = [Message(role="user", content="Riassumi questo testo.")]
+PAYLOAD_MESSAGES = [{"role": "user", "content": "Riassumi questo testo."}]
 
 
 def make_client(handler: Callable[[httpx.Request], httpx.Response]) -> LiteLLMClient:
@@ -90,7 +95,7 @@ async def test_stream_invia_payload_corretto() -> None:
 
     assert captured["payload"] == {
         "model": "gemma3:1b",
-        "messages": MESSAGES,
+        "messages": PAYLOAD_MESSAGES,
         "stream": True,
     }
     await client.aclose()

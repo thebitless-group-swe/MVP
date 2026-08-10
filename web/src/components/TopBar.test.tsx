@@ -70,7 +70,8 @@ describe('TopBar — «Analisi»', () => {
 
     const actionId = useEditorStore.getState().aiModal
     expect(actionId).toBe('critique')
-    expect(AI_ACTIONS.critique.endpoint).toContain('/api/critique')
+    expect(AI_ACTIONS.critique.label).toBe('Analisi')
+    expect(AI_ACTIONS.critique.source).toBe('text')
   })
 
   it('azzera output ed errore della chiamata precedente', async () => {
