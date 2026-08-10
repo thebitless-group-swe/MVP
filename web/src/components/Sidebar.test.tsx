@@ -40,6 +40,100 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+/*
+ * R-91-F-De (UC80.1) e R-93-F-De (UC81) — eliminazione di una nota.
+ *
+ * La logica di `deleteNote` era gia' implementata e testata, ma
+ * `grep -rn "deleteNote" web/src --include="*.tsx"` non trovava nulla: nessun
+ * punto della UI la raggiungeva, quindi il requisito era «irraggiungibile
+ * dall'interfaccia», che per l'AdR equivale a non soddisfatto.
+ *
+ * UC80.1 colloca la conferma al passo 3, **prima** dell'azione: da cui i due
+ * tempi, e da cui il fatto che annullare non debba eliminare nulla — non
+ * ripristinare qualcosa di gia' eliminato.
+ */
+describe('Sidebar — eliminazione nota', () => {
+  const ALTRA = { id: '2', title: 'Altra nota', content: 'altro', createdAt: 0, updatedAt: 0 }
+
+  /** Apre la conferma sulla nota indicata e restituisce l'utente virtuale. */
+  async function chiediEliminazione(titolo: string) {
+    render(<Sidebar />)
+    await userEvent.click(screen.getByLabelText(`Elimina «${titolo}»`))
+  }
+
+  it('il cestino chiede conferma invece di eliminare subito', async () => {
+    await chiediEliminazione('Nota')
+
+    expect(screen.getByText('Eliminare «Nota»?')).toBeInTheDocument()
+    // UC80.1: al passo 3 la nota c'e' ancora.
+    expect(useNotesStore.getState().list).toHaveLength(1)
+  })
+
+  it('conferma → la nota viene rimossa', async () => {
+    useNotesStore.setState({
+      list: [useNotesStore.getState().list[0], ALTRA],
+      currentId: '1',
+    })
+
+    await chiediEliminazione('Nota')
+    await userEvent.click(screen.getByText('Sì, elimina'))
+
+    const { list, currentId } = useNotesStore.getState()
+    expect(list).toHaveLength(1)
+    expect(list[0].id).toBe('2')
+    expect(currentId).toBe('2')
+  })
+
+  it('annullamento → lista invariata', async () => {
+    await chiediEliminazione('Nota')
+    await userEvent.click(screen.getByText('Annulla'))
+
+    expect(useNotesStore.getState().list).toHaveLength(1)
+    expect(screen.queryByText('Eliminare «Nota»?')).toBeNull()
+    // La riga torna disponibile: l'annullamento non lascia la UI a meta'.
+    expect(screen.getByLabelText('Elimina «Nota»')).toBeInTheDocument()
+  })
+
+  it('Esc → lista invariata', async () => {
+    await chiediEliminazione('Nota')
+    await userEvent.keyboard('{Escape}')
+
+    expect(useNotesStore.getState().list).toHaveLength(1)
+    expect(screen.queryByText('Eliminare «Nota»?')).toBeNull()
+  })
+
+  it('la conferma si apre su una riga sola', async () => {
+    useNotesStore.setState({
+      list: [useNotesStore.getState().list[0], ALTRA],
+      currentId: '1',
+    })
+
+    await chiediEliminazione('Nota')
+
+    expect(screen.getByText('Eliminare «Nota»?')).toBeInTheDocument()
+    expect(screen.queryByText('Eliminare «Altra nota»?')).toBeNull()
+    expect(screen.getByLabelText('Elimina «Altra nota»')).toBeInTheDocument()
+  })
+
+  it('guasto reale → messaggio a video e nota NON eliminata (UC81)', async () => {
+    // Catena intera con un'avaria vera: QuotaExceededError -> `set` ->
+    // `deleteNote` ripristina e rilancia -> `confirmDelete` intercetta ->
+    // avviso. Le tre post-condizioni di UC81 in un test solo.
+    await chiediEliminazione('Nota')
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota superata', 'QuotaExceededError')
+    })
+
+    await userEvent.click(screen.getByText('Sì, elimina'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Impossibile eliminare la nota')
+    })
+    expect(useNotesStore.getState().list).toHaveLength(1)
+    expect(useNotesStore.getState().currentId).toBe('1')
+  })
+})
+
 describe('Sidebar — handleOpenFile', () => {
   it('AbortError → nessun messaggio di errore', async () => {
     mockOpen.mockRejectedValue(new DOMException('cancelled', 'AbortError'))

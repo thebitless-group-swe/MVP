@@ -104,15 +104,57 @@ export const useNotesStore = create<NotesState>()(
           ),
         })
       },
+      /**
+       * Rimuove una nota dall'elenco e riallinea l'editor.
+       *
+       * **Il caricamento del documento non e' un ornamento.** `select` e
+       * `loadNote` lo fanno gia'; `deleteNote` era l'unica delle tre a non
+       * farlo, e finche' nessun punto della UI la raggiungeva la cosa non si
+       * vedeva. Misurato: eliminando la nota corrente, il suo testo restava
+       * nell'editor mentre `currentId` passava a un'altra nota; al primo cambio
+       * nota quel testo veniva salvato **sopra** la nota di destinazione, che
+       * perdeva il proprio contenuto senza alcun segnale.
+       *
+       * **Il ripristino risponde a UC81**, che di post-condizioni ne pretende
+       * tre: «L'integrita' del dato viene preservata. **La nota non viene
+       * eliminata.** L'utente riceve un feedback sull'errore». Le prime due
+       * stanno qui, la terza tocca al chiamante che ha l'interfaccia. E' lo
+       * stesso schema di `createEmpty`, non un secondo meccanismo.
+       *
+       * **Limite da dichiarare (R-91-F-De).** La rimozione e' a livello di
+       * applicazione: la nota sparisce dall'elenco e dalla persistenza locale,
+       * ma **il file su disco resta**. UC80.1 pretende la rimozione dal
+       * supporto fisico, che una pagina web non puo' fare su un file
+       * arbitrario — e Firefox, che R-1-V-Ob impone, non ha nemmeno la File
+       * System Access API. E' un requisito impossibile come specificato, non
+       * un requisito non implementato: va portato alla revisione dell'AdR.
+       */
       deleteNote: (id: string) => {
-  const { list, currentId } = get()
-  const newList = list.filter((note) => note.id !== id)
-  let newCurrentId = currentId
-  if (currentId === id) {
-    newCurrentId = newList[0]?.id ?? null
-  }
-  set({ list: newList, currentId: newCurrentId })
-},
+        const precedente = { list: get().list, currentId: get().currentId }
+
+        const newList = precedente.list.filter((note) => note.id !== id)
+        const eliminataLaCorrente = precedente.currentId === id
+        const newCurrentId = eliminataLaCorrente
+          ? (newList[0]?.id ?? null)
+          : precedente.currentId
+
+        try {
+          set({ list: newList, currentId: newCurrentId })
+          if (eliminataLaCorrente) {
+            const subentrata = newList.find((n) => n.id === newCurrentId)
+            useEditorStore.getState().loadDocument(subentrata?.content ?? '')
+          }
+        } catch (err) {
+          try {
+            set(precedente)
+          } catch {
+            // Vedi `createEmpty`: se nemmeno il ripristino persiste, quello che
+            // conta e' che lo stato in memoria — l'unico che l'interfaccia
+            // legge — sia gia' tornato indietro.
+          }
+          throw err
+        }
+      },
 
 loadNote: (noteData) => {
   const now = Date.now()

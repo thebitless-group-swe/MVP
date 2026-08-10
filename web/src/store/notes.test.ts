@@ -221,6 +221,74 @@ describe('useNotesStore — deleteNote', () => {
     expect(result.current.currentId).toBeNull()
     expect(result.current.list).toHaveLength(0)
   })
+
+  /*
+   * I tre test qui sopra guardano lista e `currentId`, mai l'editor — ed e' il
+   * motivo per cui il difetto seguente e' sopravvissuto finche' nessun punto
+   * della UI raggiungeva `deleteNote`.
+   *
+   * Misurato prima della correzione: eliminando la nota corrente, il suo testo
+   * restava nell'editor mentre `currentId` passava a un'altra nota. Al primo
+   * cambio nota quel testo veniva salvato **sopra** la nota di destinazione:
+   * eliminando A (contenuto 'AAA') e poi selezionando B, il contenuto di B
+   * diventava 'AAA'. Perdita di dati silenziosa.
+   */
+  it('eliminando la nota corrente, l editor carica quella che subentra', () => {
+    const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
+
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.deleteNote('a') })
+
+    expect(mockLoadDocument).toHaveBeenCalledWith('BBB')
+  })
+
+  it('eliminando l ultima nota, l editor si svuota', () => {
+    const note = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [note], currentId: 'a' })
+
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.deleteNote('a') })
+
+    expect(mockLoadDocument).toHaveBeenCalledWith('')
+  })
+
+  it('eliminando una nota NON corrente, l editor non viene toccato', () => {
+    // Il documento aperto non c'entra nulla con la nota rimossa: ricaricarlo
+    // sarebbe un salto visibile e ingiustificato.
+    const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
+
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.deleteNote('b') })
+
+    expect(result.current.currentId).toBe('a')
+    expect(mockLoadDocument).not.toHaveBeenCalled()
+  })
+
+  /*
+   * UC81, post-condizioni: «L'integrita' del dato viene preservata. La nota
+   * non viene eliminata. L'utente riceve un feedback sull'errore». Le prime
+   * due si verificano qui, la terza in `Sidebar.test.tsx`.
+   *
+   * Le asserzioni leggono `useNotesStore.getState()` e non `result.current`:
+   * quando l'eccezione interrompe l'`act` il componente non si ri-renderizza,
+   * quindi `result.current` resterebbe lo snapshot precedente e il test
+   * passerebbe anche senza ripristino.
+   */
+  it('persistenza fallita → la nota NON viene eliminata e l errore propaga', () => {
+    const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
+    const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
+    useNotesStore.setState({ list: [noteA, noteB], currentId: 'a' })
+    persistenzaRotta()
+
+    expect(() => useNotesStore.getState().deleteNote('a')).toThrow()
+
+    expect(useNotesStore.getState().list).toEqual([noteA, noteB])
+    expect(useNotesStore.getState().currentId).toBe('a')
+  })
 })
 
 describe('useNotesStore — loadNote', () => {
