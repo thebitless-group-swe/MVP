@@ -13,6 +13,7 @@ controlla con l'ambiente piu' `cache_clear()`. Un test che la infilasse in
 `dependency_overrides` passerebbe senza verificare niente, perche' quell'entrata
 non verrebbe mai consultata: sarebbe un test verde su un meccanismo inattivo.
 """
+import importlib
 from collections.abc import Iterator
 
 import pytest
@@ -110,41 +111,24 @@ class TestConfigurazione:
 
 
 class TestIlVecchioPuntoDiComposizioneNonEsistePiu:
-    """`app/llm/` sopravvive come contenitore di `prompts.py` e nient'altro.
+    """`app/llm/` non esiste piu': nessun package prende nome da una tecnologia.
 
-    Non e' pedanteria: finche' i provider restassero raggiungibili da `app.llm`,
+    La #18 aveva svuotato il package dei provider e lasciato dentro il solo
+    `prompts.py`, con un canarino che sorvegliava quello stato provvisorio; il
+    suo docstring diceva di eliminarlo quando i prompt fossero stati promossi
+    dentro `core/`. E' successo, e il canarino se n'e' andato con lui.
+
+    Quel che resta e' l'asserzione piu' forte: non che `app.llm` non esponga
+    piu' i provider, ma che non esista affatto. Finche' fosse importabile,
     «il composition root e' unico» sarebbe vero per convenzione e non per
-    costruzione, e una rotta potrebbe continuare a importarli dal vecchio
-    indirizzo senza che nulla protesti.
+    costruzione.
     """
 
-    def test_app_llm_non_espone_piu_i_provider(self) -> None:
-        import app.llm
+    def test_app_llm_non_e_piu_importabile(self) -> None:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("app.llm")
 
-        assert not hasattr(app.llm, "get_llm_client")
-        assert not hasattr(app.llm, "get_content_extractor")
-        assert not hasattr(app.llm, "close_content_extractor")
-
-    def test_app_llm_e_un_namespace_package_senza_modulo(self) -> None:
-        """Senza `__init__.py` non c'e' piu' un modulo `app.llm` da importare."""
-        import app.llm
-
-        assert app.llm.__file__ is None
-
-    def test_i_prompt_restano_dove_sono(self) -> None:
-        """CANARINO: asserisce uno stato temporaneo, non una proprieta' da tenere.
-
-        `app/llm/` contiene il solo `prompts.py` perche' la #18 si ferma al
-        composition root e non sposta i prompt. E' una fotografia di adesso, non
-        un invariante: serve a garantire che la #18 non si sia portata dietro
-        anche il trasloco dei prompt, che va rivisto per conto suo.
-
-        VA CANCELLATO dall'issue che promuove i prompt dentro `core/`: li'
-        `app.llm.prompts` non esistera' piu' e questo test fallira' per
-        costruzione. Non e' una regressione da riparare — e' il segnale che
-        quella promozione ha fatto il suo lavoro, e allora questo test si
-        elimina.
-        """
-        from app.llm.prompts import build_summarize_messages
+    def test_i_prompt_vivono_nel_dominio(self) -> None:
+        from app.core.domain.prompts.templates import build_summarize_messages
 
         assert callable(build_summarize_messages)

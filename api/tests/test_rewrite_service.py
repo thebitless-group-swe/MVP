@@ -9,9 +9,10 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+from app.core.domain.prompts.rules import STYLE_INSTRUCTIONS
+from app.core.domain.prompts.templates import build_rewrite_messages
 from app.core.domain.values import Style
 from app.core.services.rewrite import rewrite
-from app.llm.prompts import STYLE_INSTRUCTIONS, build_rewrite_messages
 from tests.conftest import DummyLLMClient
 
 TEXT = "Il mare d'inverno e' un concetto che il pensiero non considera."

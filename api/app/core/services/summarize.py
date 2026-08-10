@@ -21,14 +21,14 @@ altri sei seguono.
     ancora rispondere 503 (UC 62), e all'utente di vedere il testo comparire a
     mano a mano invece che tutto insieme.
 
-Nota sull'import di `llm.prompts`: i prompt sono dominio, ma vivono ancora
-fuori da `core/`. Finche' non vengono promossi a template di dominio, questo e'
-l'unico import di questo modulo che non punta verso il centro; gli altri due
-sono gia' al loro posto.
+Tutti e tre gli import puntano ormai verso il centro: fino a poco fa i prompt
+erano l'eccezione, perche' vivevano in `llm/prompts.py` e questo modulo doveva
+uscire da `core/` per costruire il proprio messaggio. Ora sono in
+`core/domain/prompts/`, dove il loro contenuto dice che stanno.
 """
 from collections.abc import AsyncIterator
 
-from ...llm.prompts import build_summarize_messages
+from ..domain.prompts.templates import build_summarize_messages
 from ..domain.values import Length
 from ..ports.llm_client import LLMClient
 

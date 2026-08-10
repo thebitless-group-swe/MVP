@@ -9,9 +9,10 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+from app.core.domain.prompts.rules import LENGTH_INSTRUCTIONS
+from app.core.domain.prompts.templates import build_generate_messages
 from app.core.domain.values import Length
 from app.core.services.generate import generate
-from app.llm.prompts import LENGTH_INSTRUCTIONS, build_generate_messages
 from tests.conftest import DummyLLMClient
 
 PROMPT = "Scrivi un testo sul mare d'inverno, con qualche riferimento a Battiato."

@@ -17,9 +17,9 @@ from typing import get_args
 
 import pytest
 
+from app.core.domain.prompts.templates import build_critique_messages
 from app.core.domain.values import Hat
 from app.core.services.critique import critique
-from app.llm.prompts import build_critique_messages
 from tests.conftest import DummyLLMClient
 
 TEXT = "Il progetto raddoppiera' il fatturato entro sei mesi, senza assumere nessuno."

@@ -1,11 +1,12 @@
 """Test B-02: enum e schemi delle quattro nuove richieste AI."""
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import get_args
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.core.domain.values import Message
 from app.core.ports.llm_client import LLMClient
 from app.dependencies import get_llm_client
 from app.main import app
@@ -29,7 +30,7 @@ class SpyLLMClient(LLMClient):
     def __init__(self) -> None:
         self.calls = 0
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         self.calls += 1
         yield "chunk"
 

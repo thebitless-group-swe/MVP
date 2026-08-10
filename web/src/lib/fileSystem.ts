@@ -1,5 +1,7 @@
 // lib/fileSystem.ts
 
+import { newId } from './id'
+
 export interface Note {
   id: string
   title: string
@@ -123,7 +125,7 @@ export async function openNoteFromFile(): Promise<Note | null> {
   const title = fileName ? fileName.replace(/\.(md|txt)$/i, '') : TITOLO_DI_RIPIEGO
 
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     title,
     content: text,
     createdAt: now,

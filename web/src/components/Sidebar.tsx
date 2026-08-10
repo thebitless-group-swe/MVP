@@ -49,6 +49,28 @@ export function Sidebar() {
     }
   }
 
+  /**
+   * Crea una nota, con il percorso d'errore che R-84-F-Ob (UC75) richiede.
+   *
+   * Era l'unica delle tre operazioni della sidebar a non averne uno: `apri` e
+   * `salva` qui sopra lo hanno gia'. Riusa lo stesso `fileError` e lo stesso
+   * `role="alert"`, deliberatamente: un secondo canale d'errore per la stessa
+   * barra sarebbe due meccanismi da mantenere per un solo comportamento.
+   *
+   * UC75 chiede di informare l'utente **e** di preservare lo stato precedente:
+   * la prima parte e' il messaggio, la seconda vale perche' `createEmpty`
+   * genera l'id prima di mutare qualsiasi cosa (vedi `store/notes.ts`).
+   */
+  function handleCreate() {
+    setFileError(null)
+    try {
+      createEmpty()
+    } catch {
+      // R-110-F-Ob: causa e azione correttiva, nessun dettaglio tecnico.
+      setFileError('Impossibile creare la nota. Riprova.')
+    }
+  }
+
   function handleSelect(id: string) {
     select(id)
   }
@@ -114,7 +136,7 @@ export function Sidebar() {
       <div className="space-y-1 px-2">
         <button
           type="button"
-          onClick={createEmpty}
+          onClick={handleCreate}
           className={cn(actionButton, 'bg-primary text-primary-foreground hover:bg-primary/90')}
         >
           <Plus className="size-4 shrink-0" aria-hidden="true" />

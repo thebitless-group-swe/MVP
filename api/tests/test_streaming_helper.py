@@ -1,11 +1,12 @@
 """Test B-01: helper unico per lo streaming SSE (infrastructure/adapters/sse_streaming.py)."""
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import httpx
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.core.domain.values import Message
 from app.core.ports.llm_client import LLMClient, LLMProviderError
 from app.dependencies import get_llm_client
 from app.infrastructure.adapters.litellm_client import LiteLLMClient
@@ -172,7 +173,7 @@ async def test_real_fixture_preserves_the_newline_chunk(sse_chunks: str) -> None
 
     response = await sse_response(
         _ConnectedRequest(),  # type: ignore[arg-type]
-        client.stream([{"role": "user", "content": "x"}]),
+        client.stream([Message(role="user", content="x")]),
         "test",
     )
     body = await _collect(response)
@@ -192,7 +193,7 @@ async def test_real_fixture_preserves_the_newline_chunk(sse_chunks: str) -> None
 class _MidStreamErrorClient(LLMClient):
     """Emette un chunk valido, poi fallisce a meta' stream."""
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         yield "parziale"
         raise LLMProviderError(f"Errore provider con chiave {SENTINEL_SECRET}")
 
