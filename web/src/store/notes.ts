@@ -6,7 +6,7 @@ import { useEditorStore } from './useEditorStore'
 type NotesState = {
   list: Note[]
   currentId: string | null
-  createEmpty: () => Note
+  createEmpty: (title: string) => Note
   select: (id: string) => void
   updateCurrent: (patch: Partial<Pick<Note, 'title' | 'content'>>) => void
   deleteNote: (id: string) => void
@@ -19,7 +19,17 @@ export const useNotesStore = create<NotesState>()(
       list: [],
       currentId: null,
 
-      createEmpty: () => {
+      /**
+       * Crea una nota nuova con il titolo indicato dall'utente.
+       *
+       * R-114-F-Ob (UC74.3) impone che il titolo sia *chiesto* in fase di
+       * creazione: prima qui c'era `'Senza titolo'` assegnato d'ufficio, che
+       * e' il difetto che questa firma elimina. La ricaduta resta, ma solo
+       * per la stringa vuota, e sta qui e non nel chiamante perche' il punto
+       * di verita' dev'essere uno solo. Il `trim()` e' la stessa convenzione
+       * gia' adottata da `renameNote` in `lib/fileSystem.ts`.
+       */
+      createEmpty: (title: string) => {
         const {currentId} = get()
         if (currentId) {
           const content = useEditorStore.getState().currentText
@@ -31,16 +41,16 @@ export const useNotesStore = create<NotesState>()(
         }
         const now = Date.now()
         const note: Note = {
-        id: crypto.randomUUID(),
-        title: 'Senza titolo',
-        content: '',
-        createdAt: now,
-        updatedAt: now,
-  }
-  set((s) => ({ list: [...s.list, note], currentId: note.id }))
-  useEditorStore.getState().loadDocument('')
-  return note
-},
+          id: crypto.randomUUID(),
+          title: title.trim() || 'Senza titolo',
+          content: '',
+          createdAt: now,
+          updatedAt: now,
+        }
+        set((s) => ({ list: [...s.list, note], currentId: note.id }))
+        useEditorStore.getState().loadDocument('')
+        return note
+      },
 
       select(id: string) {
         const { currentId } = get()

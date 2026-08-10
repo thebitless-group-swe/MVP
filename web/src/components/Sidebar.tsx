@@ -23,6 +23,10 @@ export function Sidebar() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [fileError, setFileError] = useState<string | null>(null)
+  // UC74.3: la creazione e' in due tempi — prima il sistema chiede il titolo,
+  // poi la nota nasce. `creating` e' la fase intermedia, che prima non esisteva.
+  const [creating, setCreating] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
 
   async function handleOpenFile() {
 
@@ -51,6 +55,33 @@ export function Sidebar() {
 
   function handleSelect(id: string) {
     select(id)
+  }
+
+  function startCreate() {
+    setNewTitle('')
+    setCreating(true)
+  }
+
+  /**
+   * Annulla la richiesta del titolo. Non crea nulla: la nota non deve esistere
+   * se l'utente non conferma.
+   *
+   * Non e' agganciato a `onBlur`, al contrario della rinomina qui sotto. La
+   * differenza e' voluta e viene da UC74.3, che di uscite ne prevede due —
+   * «l'utente inserisce il titolo e conferma» — mentre il blur non e' nessuna
+   * delle due: interpretarlo come conferma farebbe nascere note che nessuno ha
+   * chiesto, interpretarlo come annullamento butterebbe via in silenzio quello
+   * che l'utente ha appena scritto. Il campo resta aperto finche' non decide.
+   */
+  function cancelCreate() {
+    setCreating(false)
+    setNewTitle('')
+  }
+
+  function commitCreate() {
+    createEmpty(newTitle)
+    setCreating(false)
+    setNewTitle('')
   }
 
   function startRename(note: { id: string; title: string }) {
@@ -112,14 +143,37 @@ export function Sidebar() {
       </div>
 
       <div className="space-y-1 px-2">
-        <button
-          type="button"
-          onClick={createEmpty}
-          className={cn(actionButton, 'bg-primary text-primary-foreground hover:bg-primary/90')}
-        >
-          <Plus className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Nuova nota</span>
-        </button>
+        {creating ? (
+          <div className="flex flex-col gap-1">
+            <input
+              autoFocus
+              aria-label="Titolo della nuova nota"
+              placeholder="Titolo della nota…"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitCreate()
+                if (e.key === 'Escape') cancelCreate()
+              }}
+              className={cn(
+                'w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+                'outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              )}
+            />
+            <p className="px-1 text-xs text-muted-foreground">
+              Invio per creare · Esc per annullare
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={startCreate}
+            className={cn(actionButton, 'bg-primary text-primary-foreground hover:bg-primary/90')}
+          >
+            <Plus className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">Nuova nota</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={handleOpenFile}

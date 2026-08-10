@@ -36,15 +36,45 @@ beforeEach(() => {
   useNotesStore.setState({ list: [], currentId: null })
 })
 
+/*
+ * R-114-F-Ob (UC74.3) — il titolo lo fornisce l'utente.
+ *
+ * L'asserzione `expect(title).toBe('Senza titolo')` che stava qui non
+ * verificava un comportamento: ratificava il difetto, cioe' il titolo
+ * assegnato d'ufficio. Per questo e' stata riscritta e non adattata. Il
+ * valore di ripiego sopravvive in un test solo, quello che ne descrive
+ * l'unica occasione legittima: la stringa vuota.
+ */
 describe('useNotesStore — createEmpty', () => {
-  it('crea una nota vuota e la imposta come corrente', () => {
+  it('crea la nota con il titolo indicato dall utente', () => {
     const { result } = renderHook(() => useNotesStore())
-    act(() => { result.current.createEmpty() })
+    act(() => { result.current.createEmpty('Appunti di algebra') })
 
     expect(result.current.list).toHaveLength(1)
     expect(result.current.currentId).toBe(result.current.list[0].id)
-    expect(result.current.list[0].title).toBe('Senza titolo')
+    expect(result.current.list[0].title).toBe('Appunti di algebra')
     expect(result.current.list[0].content).toBe('')
+  })
+
+  it('un titolo vuoto ricade su "Senza titolo"', () => {
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty('') })
+
+    expect(result.current.list[0].title).toBe('Senza titolo')
+  })
+
+  it('un titolo di soli spazi ricade su "Senza titolo"', () => {
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty('   ') })
+
+    expect(result.current.list[0].title).toBe('Senza titolo')
+  })
+
+  it('scarta gli spazi ai bordi del titolo', () => {
+    const { result } = renderHook(() => useNotesStore())
+    act(() => { result.current.createEmpty('  Bozza capitolo 3  ') })
+
+    expect(result.current.list[0].title).toBe('Bozza capitolo 3')
   })
 
   it('salva il contenuto editor sulla nota corrente prima di creare', () => {
@@ -52,7 +82,7 @@ describe('useNotesStore — createEmpty', () => {
     useNotesStore.setState({ list: [existingNote], currentId: 'a' })
 
     const { result } = renderHook(() => useNotesStore())
-    act(() => { result.current.createEmpty() })
+    act(() => { result.current.createEmpty('Nuova') })
 
     const saved = result.current.list.find((n) => n.id === 'a')
     expect(saved?.content).toBe('testo editor')
@@ -60,7 +90,7 @@ describe('useNotesStore — createEmpty', () => {
 
   it('imposta il testo editor a stringa vuota dopo la creazione (usando loadDocument)', () => {
     const { result } = renderHook(() => useNotesStore())
-    act(() => { result.current.createEmpty() })
+    act(() => { result.current.createEmpty('Nuova') })
     // Ora il codice chiama loadDocument('') invece di setCurrentText('')
     expect(mockLoadDocument).toHaveBeenCalledWith('')
     // Verifica che loadDocument sia stato chiamato una volta
