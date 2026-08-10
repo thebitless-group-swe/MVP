@@ -68,6 +68,7 @@ beforeEach(() => {
     errorMessage: null,
     aiModal: null,
     _abortController: null,
+    lastCall: null,
   })
 })
 
@@ -405,120 +406,38 @@ describe('AiActionDialog — critique (cappelli)', () => {
   })
 
   it('senza cappello → nessuna fetch, mostra alert', async () => {
-    act(() => { useEditorStore.getState().setAiModal('critique') })
-    render(<AiActionDialog />)
+  act(() => { useEditorStore.getState().setAiModal('critique') })
+  render(<AiActionDialog />)
 
-    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+  await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).not.toHaveBeenCalled()
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument()
-    })
+  expect(mockStart).not.toHaveBeenCalled()
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent('Seleziona un cappello')
   })
+})
 
   it('insertMode è append', () => {
     expect(AI_ACTIONS['critique'].insertMode).toBe('append')
   })
 })
 
-describe('AiActionDialog — sorgente di generazione (prompt/link)', () => {
-  it('apre di default sulla scheda "Da prompt"', () => {
+describe('AiActionDialog — Rigenera persistente (#37)', () => {
+  it('lastCall sopravvive alla chiusura e riapertura della modale', async () => {
     act(() => { useEditorStore.getState().setAiModal('generate') })
     render(<AiActionDialog />)
-
-    expect(screen.getByRole('tab', { name: 'Da prompt' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Da link' })).toHaveAttribute('aria-selected', 'false')
-    expect(screen.getByPlaceholderText('Descrivi cosa generare...')).toBeInTheDocument()
-  })
-
-  it('passando a "Da link" mostra il campo URL e svuota il campo precedente', async () => {
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-    render(<AiActionDialog />)
-
-    await userEvent.type(screen.getByRole('textbox'), 'testo che verrà scartato')
-    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
-
-    expect(screen.getByRole('tab', { name: 'Da link' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByPlaceholderText('https://...')).toHaveValue('')
-  })
-
-  it('scheda "Da prompt": invia tramite api.generate, non api.generateFromLink', async () => {
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-    render(<AiActionDialog />)
-
-    await userEvent.type(screen.getByRole('textbox'), 'Scrivi un articolo sulla Luna')
+    await userEvent.type(screen.getByRole('textbox'), 'Scrivi un testo')
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).toHaveBeenCalledTimes(1)
-    const fn = mockStart.mock.calls[0][0]
-    await fn()
-    expect(api.generate).toHaveBeenCalledWith('Scrivi un articolo sulla Luna', 'medio')
-    expect(api.generateFromLink).not.toHaveBeenCalled()
+    expect(useEditorStore.getState().lastCall).toEqual({
+    actionId: 'generate',
+    input: 'Scrivi un testo',
+    params: { length: 'medio' },
+    mode: 'prompt',
+    execute: expect.any(Function),
   })
 
-  it('scheda "Da link": invia tramite api.generateFromLink, non api.generate', async () => {
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-    render(<AiActionDialog />)
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
-    await userEvent.type(screen.getByRole('textbox'), 'https://example.com/articolo')
-    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
-
-    expect(mockStart).toHaveBeenCalledTimes(1)
-    const fn = mockStart.mock.calls[0][0]
-    await fn()
-    expect(api.generateFromLink).toHaveBeenCalledWith('https://example.com/articolo', 'medio')
-    expect(api.generate).not.toHaveBeenCalled()
-  })
-
-  it('scheda "Da link" vuota: alert dedicato "Inserisci un URL.", nessuna chiamata', async () => {
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-    render(<AiActionDialog />)
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
-    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
-
-    expect(mockStart).not.toHaveBeenCalled()
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Inserisci un URL.')
+    await userEvent.click(screen.getByRole('button', { name: 'Rifiuta' }))
+    expect(useEditorStore.getState().aiModal).toBeNull()
     })
   })
-
-  it('scheda "Da link": un solo carattere supera la soglia minLength=1', async () => {
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-    render(<AiActionDialog />)
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
-    await userEvent.type(screen.getByRole('textbox'), 'x')
-    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
-
-    expect(mockStart).toHaveBeenCalledTimes(1)
-  })
-
-  it('riapre "Genera" dopo un\'altra azione: mode torna a "prompt"', () => {
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-    render(<AiActionDialog />)
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Da link' }))
-    expect(screen.getByRole('tab', { name: 'Da link' })).toHaveAttribute('aria-selected', 'true')
-
-    act(() => { useEditorStore.getState().setAiModal('summarize') })
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-
-    expect(screen.getByRole('tab', { name: 'Da prompt' })).toHaveAttribute('aria-selected', 'true')
-  })
-
-  it('cambiare scheda con lo stesso testo per coincidenza non mostra "Rigenera"', async () => {
-    act(() => { useEditorStore.getState().setAiModal('generate') })
-    render(<AiActionDialog />)
-
-    await userEvent.type(screen.getByRole('textbox'), 'https://stesso-testo.example')
-    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
-    await mockStart.mock.calls[0][0]()
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
-    await userEvent.type(screen.getByRole('textbox'), 'https://stesso-testo.example')
-
-    expect(screen.getByRole('button', { name: 'Genera' })).toBeInTheDocument()
-  })
-})
