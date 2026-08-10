@@ -18,11 +18,13 @@ dell'adattatore ed e' coperto in test_tavily_extractor.py. Qui non si ripete
 nulla di tutto questo.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import pytest
 
-from app.core.domain.values import MAX_TEXT_LENGTH, Length
+from app.core.domain.prompts.rules import LENGTH_INSTRUCTIONS
+from app.core.domain.prompts.templates import build_generate_from_link_messages
+from app.core.domain.values import MAX_TEXT_LENGTH, Length, Message
 from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
 from app.core.services.generate_from_link import (
     MAX_URL_LENGTH,
@@ -32,7 +34,6 @@ from app.core.services.generate_from_link import (
     generate_from_link,
     validate_link,
 )
-from app.llm.prompts import LENGTH_INSTRUCTIONS, build_generate_from_link_messages
 from tests.conftest import DummyContentExtractor, DummyLLMClient
 
 CONTENUTO_ESTRATTO = "Contenuto di esempio per il test."
@@ -73,7 +74,7 @@ class LLMClientSpia(DummyLLMClient):
         super().__init__()
         self.stream_calls = 0
 
-    def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         self.stream_calls += 1
         return super().stream(messages)
 

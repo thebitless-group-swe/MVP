@@ -9,11 +9,12 @@ Il provider e' simulato da DummyErrorLLMClient, il cui stream() solleva
 LLMProviderError prima di emettere qualunque chunk (caso "early"): la route
 deve intercettarlo PRIMA di restituire StreamingResponse e rispondere 503.
 """
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.domain.values import Message
 from app.core.ports.llm_client import LLMClient, LLMProviderError
 from app.dependencies import get_llm_client, get_settings
 from app.main import app
@@ -34,7 +35,7 @@ class DummyErrorLLMClient(LLMClient):
     che, anche se l'eccezione interna la contiene, non trapela al client.
     """
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         raise LLMProviderError(
             f"Errore interno provider con chiave {SENTINEL_API_KEY}"
         )

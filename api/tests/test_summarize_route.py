@@ -1,12 +1,13 @@
 import asyncio
 import logging
 import warnings
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.domain.values import Message
 from app.core.ports.llm_client import LLMClient
 from app.dependencies import get_llm_client
 from app.main import app
@@ -93,7 +94,7 @@ def test_endpoint_uses_injected_client() -> None:
 class SlowDummyLLMClient(LLMClient):
     CHUNKS = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         for chunk in self.CHUNKS:
             await asyncio.sleep(0.05)
             yield chunk

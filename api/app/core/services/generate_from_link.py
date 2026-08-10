@@ -6,14 +6,11 @@ L'estrazione era gia' cosi' quando stava in `llm/fetch_url.py`, ma il package lo
 teneva fra dominio e infrastruttura, dove nessuno lo avrebbe cercato.
 
 Fino alla #17 questo modulo era l'unico del backend a dipendere *solo* da porte,
-e il docstring se ne vantava. Non e' piu' vero: la #17 gli ha dato un template
-di prompt, e i template stanno ancora in `llm/prompts.py`, quindi
-`build_generate_from_link_messages` e' un import che punta fuori da `core/`.
-La stessa deroga di summarize.py, per la stessa ragione — i prompt sono dominio
-ma non sono ancora collocati nel dominio — e finche' dura e' l'unica freccia di
-questo modulo che non punta verso il centro. Vale la pena saperlo: essendo
-l'unico modulo che aveva la proprieta' piena, e' anche l'argomento piu' forte a
-favore dell'issue che promuove i prompt dentro `core/`.
+e il docstring se ne vantava; poi la #17 gli ha dato un template di prompt, che
+allora viveva in `llm/prompts.py`, e la proprieta' si era persa. Con i prompt
+promossi in `core/domain/prompts/` e' tornata vera, e stavolta non per il caso
+di un modulo che aveva poco da importare: nessuna delle frecce che partono da
+qui esce dal centro.
 
 Forma e convenzioni sono quelle fissate dal pilota in summarize.py. E' l'unico
 dei sette use case a dipendere da due porte, e questo si riflette in due punti:
@@ -36,7 +33,7 @@ puo' continuare a catturare il solo `FetchError`.
 """
 from collections.abc import AsyncIterator
 
-from ...llm.prompts import build_generate_from_link_messages
+from ..domain.prompts.templates import build_generate_from_link_messages
 from ..domain.values import MAX_TEXT_LENGTH, Length
 from ..ports.content_extractor import ContentExtractor, ContentExtractorError
 from ..ports.llm_client import LLMClient
