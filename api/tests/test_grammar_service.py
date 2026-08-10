@@ -14,8 +14,8 @@ verificherebbe nulla in piu'.
 """
 from collections.abc import AsyncIterator
 
+from app.core.domain.prompts.templates import build_grammar_messages
 from app.core.services.grammar import grammar
-from app.llm.prompts import build_grammar_messages
 from tests.conftest import DummyLLMClient
 
 TEXT = "Un testo abbastanza lungo da poter contenere qualche errore di ortografia."

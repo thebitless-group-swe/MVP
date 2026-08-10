@@ -1,9 +1,10 @@
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.domain.values import Message
 from app.core.ports.content_extractor import ContentExtractor, ContentExtractorError
 from app.core.ports.llm_client import LLMClient
 from app.dependencies import get_content_extractor
@@ -27,9 +28,9 @@ class DummyLLMClient(LLMClient):
 
     def __init__(self, chunks: list[str] | None = None) -> None:
         self._chunks = chunks if chunks is not None else self.DEFAULT_CHUNKS
-        self.received_messages: list[dict] | None = None
+        self.received_messages: Sequence[Message] | None = None
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         self.received_messages = messages
         for chunk in self._chunks:
             yield chunk

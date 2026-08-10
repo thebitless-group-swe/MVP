@@ -10,9 +10,9 @@ from typing import get_args
 
 import pytest
 
+from app.core.domain.prompts.templates import build_translate_messages
 from app.core.domain.values import Language
 from app.core.services.translate import translate
-from app.llm.prompts import build_translate_messages
 from tests.conftest import DummyLLMClient
 
 TEXT = "Il mare d'inverno e' un concetto che il pensiero non considera."

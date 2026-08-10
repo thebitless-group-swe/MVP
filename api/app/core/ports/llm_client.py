@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+
+from ..domain.values import Message
 
 
 class LLMProviderError(Exception):
@@ -26,8 +28,14 @@ class LLMClient(ABC):
     """Porta per lo streaming di completamenti da un provider LLM."""
 
     @abstractmethod
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
         """Yield chunk testuali (delta.content) dal provider LLM.
+
+        Il parametro e' una sequenza di `Message`, non di dizionari: la forma
+        di filo del provider — le chiavi «role» e «content» — sta oltre la
+        porta, dentro l'adattatore, che e' l'unico modulo autorizzato a
+        conoscerla. `Sequence` e non `list` perche' la porta legge e non
+        modifica: i template producono liste, i test possono passare tuple.
 
         La porta non dichiara `aclose`: la chiusura di eventuali risorse di
         trasporto e' un dettaglio dell'adattatore, e il lifespan la richiede

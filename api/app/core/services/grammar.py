@@ -8,7 +8,7 @@ solo campo `text` — quindi qui non c'e' un vocabolario da condividere.
 """
 from collections.abc import AsyncIterator
 
-from ...llm.prompts import build_grammar_messages
+from ..domain.prompts.templates import build_grammar_messages
 from ..ports.llm_client import LLMClient
 
 

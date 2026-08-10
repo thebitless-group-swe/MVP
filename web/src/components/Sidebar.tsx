@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, FolderOpen, Plus, Save } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, FolderOpen, Plus, Save, Trash2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { openNoteFromFile, renameNote, saveNoteToFile } from '@/lib/fileSystem'
@@ -20,6 +20,7 @@ export function Sidebar() {
   const createEmpty = useNotesStore((s) => s.createEmpty)
   const loadNote = useNotesStore((s) => s.loadNote)
   const updateCurrent = useNotesStore((s) => s.updateCurrent)
+  const deleteNote = useNotesStore((s) => s.deleteNote)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [fileError, setFileError] = useState<string | null>(null)
@@ -27,6 +28,11 @@ export function Sidebar() {
   // poi la nota nasce. `creating` e' la fase intermedia, che prima non esisteva.
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  // UC80.1 passo 3: anche la rimozione e' in due tempi, e questo e' quello di
+  // mezzo. Tiene l'id della nota per cui e' stata chiesta conferma, non un
+  // booleano: altrimenti aprendo la conferma su una riga resterebbe aperta
+  // anche sulle altre.
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleOpenFile() {
 
@@ -50,6 +56,35 @@ export function Sidebar() {
     } catch (err) {
       if (err != null && (err as { name?: string }).name === 'AbortError') return
       setFileError("Impossibile salvare il file. Riprova.")
+    }
+  }
+
+  /**
+   * Crea una nota col titolo dato, con il percorso d'errore che R-84-F-Ob
+   * (UC75) richiede. Restituisce `false` se la creazione non e' riuscita.
+   *
+   * Era l'unica delle tre operazioni della sidebar a non averne uno: `apri` e
+   * `salva` qui sopra lo hanno gia'. Riusa lo stesso `fileError` e lo stesso
+   * `role="alert"`, deliberatamente: un secondo canale d'errore per la stessa
+   * barra sarebbe due meccanismi da mantenere per un solo comportamento.
+   *
+   * UC75 chiede di informare l'utente **e** di preservare lo stato precedente:
+   * la prima parte e' il messaggio, la seconda vale perche' `createEmpty`
+   * genera l'id prima di mutare qualsiasi cosa (vedi `store/notes.ts`).
+   *
+   * L'esito torna al chiamante invece di fermarsi qui perche' con UC74.3 la
+   * creazione e' in due tempi: e' `commitCreate` a sapere che c'e' un campo
+   * titolo aperto, e a doverlo lasciare aperto se la nota non e' nata.
+   */
+  function handleCreate(title: string): boolean {
+    setFileError(null)
+    try {
+      createEmpty(title)
+      return true
+    } catch {
+      // R-110-F-Ob: causa e azione correttiva, nessun dettaglio tecnico.
+      setFileError('Impossibile creare la nota. Riprova.')
+      return false
     }
   }
 
@@ -78,10 +113,38 @@ export function Sidebar() {
     setNewTitle('')
   }
 
+  /**
+   * Conferma la creazione. Il campo si chiude **solo se la nota e' nata**.
+   *
+   * Se `handleCreate` fallisce, `creating` resta acceso e `newTitle` intatto:
+   * l'avviso compare nella barra e il titolo appena scritto e' ancora li',
+   * pronto per un secondo tentativo. Chiudere il campo scarterebbe quello che
+   * l'utente ha digitato proprio nel momento in cui gli si chiede di riprovare,
+   * ed e' l'opposto del «preservare lo stato precedente» di UC75.
+   */
   function commitCreate() {
-    createEmpty(newTitle)
+    if (!handleCreate(newTitle)) return
     setCreating(false)
     setNewTitle('')
+  }
+
+  /**
+   * Elimina una nota, con il percorso d'errore che R-93-F-De (UC81) richiede.
+   *
+   * La conferma e' gia' avvenuta quando si arriva qui: UC80.1 la colloca al
+   * passo 3, prima dell'azione, e non come annullamento successivo.
+   */
+  function confirmDelete(id: string) {
+    setFileError(null)
+    try {
+      deleteNote(id)
+    } catch {
+      // R-110-F-Ob: causa e azione correttiva, nessun dettaglio tecnico.
+      // UC81 chiede anche che la nota NON risulti eliminata: se ne occupa
+      // `deleteNote`, che ripristina prima di rilanciare.
+      setFileError('Impossibile eliminare la nota. Riprova.')
+    }
+    setDeletingId(null)
   }
 
   function startRename(note: { id: string; title: string }) {
@@ -231,22 +294,71 @@ export function Sidebar() {
                         'outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       )}
                     />
+                  ) : deletingId === note.id ? (
+                    <div
+                      className="flex flex-col gap-1 rounded-md border border-destructive/40 px-3 py-2"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setDeletingId(null)
+                      }}
+                    >
+                      <p className="text-xs text-foreground">
+                        Eliminare «{note.title || 'Senza titolo'}»?
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          autoFocus
+                          onClick={() => confirmDelete(note.id)}
+                          className="rounded-md bg-destructive px-2 py-1 text-xs font-medium text-white hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Sì, elimina
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingId(null)}
+                          className="rounded-md px-2 py-1 text-xs text-foreground/80 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleSelect(note.id)}
-                      onDoubleClick={() => startRename(note)}
-                      aria-current={active ? 'page' : undefined}
+                    /*
+                     * Due comandi affiancati, non annidati: il cestino non puo'
+                     * stare dentro il pulsante della nota, perche' un `button`
+                     * dentro un `button` non e' marcatura valida e le tecnologie
+                     * assistive non saprebbero quale dei due sta per essere
+                     * attivato.
+                     */
+                    <div
                       className={cn(
-                        'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                        'flex items-center rounded-md transition-colors',
                         'text-foreground/80 hover:bg-muted hover:text-foreground',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         active && 'bg-muted font-medium text-foreground',
                       )}
                     >
-                      <FileText className="size-4 shrink-0" aria-hidden="true" />
-                      <span className="truncate">{note.title || 'Senza titolo'}</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelect(note.id)}
+                        onDoubleClick={() => startRename(note)}
+                        aria-current={active ? 'page' : undefined}
+                        className={cn(
+                          'flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-sm',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        )}
+                      >
+                        <FileText className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{note.title || 'Senza titolo'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingId(note.id)}
+                        aria-label={`Elimina «${note.title || 'Senza titolo'}»`}
+                        className="mr-1 shrink-0 rounded-md p-1.5 text-foreground/60 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </button>
+                    </div>
                   )}
                 </li>
               )
