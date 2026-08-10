@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { EditorView } from '@codemirror/view'
+import type { AiParams } from '@/lib/aiActions'
 
 // V4: layout dell'area di lavoro — solo editor, solo render, o affiancati.
 export type ViewMode = 'editor' | 'render' | 'split'
@@ -14,6 +15,14 @@ export type AiActionId =
 | 'generate-link'
 
 export type AiModal = null | AiActionId
+
+export type LastCall = {
+  input: string
+  params: AiParams
+  mode?: 'prompt' | 'link'
+  actionId: AiActionId
+  execute: () => AsyncIterable<string>
+}
 
 interface EditorState {
   currentText: string
@@ -42,6 +51,9 @@ interface EditorState {
   _abortController: AbortController | null
   _setAbortController: (c: AbortController | null) => void
   abortStream: () => void
+  lastCall: LastCall | null
+  setLastCall: (call: LastCall) => void
+  clearLastCall: () => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -63,6 +75,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({ streamedOutput: s.streamedOutput + chunk })),
   finishStreaming: () => set({ isGenerating: false }),
   errorMessage: null,
+  lastCall: null,
+  setLastCall: (call) => set({ lastCall: call }),
+  clearLastCall: () => set({ lastCall: null }),
   // su errore fermiamo anche lo spinner: niente generazione in corso con errore a video
   setError: (msg) => set({ errorMessage: msg, isGenerating: false }),
   clearError: () => set({ errorMessage: null }),

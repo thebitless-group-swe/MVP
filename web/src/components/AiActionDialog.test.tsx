@@ -68,6 +68,7 @@ beforeEach(() => {
     errorMessage: null,
     aiModal: null,
     _abortController: null,
+    lastCall: null,
   })
 })
 
@@ -405,18 +406,38 @@ describe('AiActionDialog — critique (cappelli)', () => {
   })
 
   it('senza cappello → nessuna fetch, mostra alert', async () => {
-    act(() => { useEditorStore.getState().setAiModal('critique') })
-    render(<AiActionDialog />)
+  act(() => { useEditorStore.getState().setAiModal('critique') })
+  render(<AiActionDialog />)
 
-    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+  await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    expect(mockStart).not.toHaveBeenCalled()
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument()
-    })
+  expect(mockStart).not.toHaveBeenCalled()
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent('Seleziona un cappello')
   })
+})
 
   it('insertMode è append', () => {
     expect(AI_ACTIONS['critique'].insertMode).toBe('append')
   })
 })
+
+describe('AiActionDialog — Rigenera persistente (#37)', () => {
+  it('lastCall sopravvive alla chiusura e riapertura della modale', async () => {
+    act(() => { useEditorStore.getState().setAiModal('generate') })
+    render(<AiActionDialog />)
+    await userEvent.type(screen.getByRole('textbox'), 'Scrivi un testo')
+    await userEvent.click(screen.getByRole('button', { name: /genera/i }))
+
+    expect(useEditorStore.getState().lastCall).toEqual({
+    actionId: 'generate',
+    input: 'Scrivi un testo',
+    params: { length: 'medio' },
+    mode: 'prompt',
+    execute: expect.any(Function),
+  })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rifiuta' }))
+    expect(useEditorStore.getState().aiModal).toBeNull()
+    })
+  })

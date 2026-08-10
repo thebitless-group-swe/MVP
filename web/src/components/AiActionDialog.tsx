@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useReducer, useEffect } from 'react'
 import { Dialog } from 'radix-ui'
 import {
   useAiModal,
@@ -7,6 +7,7 @@ import {
   useIsGenerating,
   useStreamedOutput,
   type AiActionId,
+  type LastCall,
 } from '@/store/useEditorStore'
 import { MarkdownView } from '@/components/MarkdownView'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -70,6 +71,49 @@ const HAT_DEFS = [
   { value: 'blu', label: 'Organizzativo', description: 'Processo, struttura e prossimi passi', color: 'border-blue-300 bg-blue-50 text-blue-900' },
 ] satisfies HatDef[]
 
+type UiState = {
+  params: AiParams
+  input: string
+  mode: 'prompt' | 'link'
+  validationError: string | null
+}
+
+type UiAction =
+  | { type: 'SET_PARAMS'; payload: AiParams }
+  | { type: 'SET_INPUT'; payload: string }
+  | { type: 'SET_MODE'; payload: 'prompt' | 'link' }
+  | { type: 'SET_VALIDATION_ERROR'; payload: string | null }
+  | { type: 'RESTORE_FROM_LAST_CALL'; payload: { params: AiParams; input: string; mode: 'prompt' | 'link' } }
+  | { type: 'RESET_DEFAULT'; payload: { actionId: AiActionId } }
+
+  const uiReducer = (state: UiState, action: UiAction): UiState => {
+  switch (action.type) {
+    case 'SET_PARAMS':
+      return { ...state, params: action.payload }
+    case 'SET_INPUT':
+      return { ...state, input: action.payload }
+    case 'SET_MODE':
+      return { ...state, mode: action.payload }
+    case 'SET_VALIDATION_ERROR':
+      return { ...state, validationError: action.payload }
+    case 'RESTORE_FROM_LAST_CALL':
+      return {
+        params: action.payload.params,
+        input: action.payload.input,
+        mode: action.payload.mode,
+        validationError: null,
+      }
+    case 'RESET_DEFAULT':
+      return {
+        params: getDefaultParams(action.payload.actionId),
+        input: '',
+        mode: 'prompt',
+        validationError: null,
+      }
+    default:
+      return state
+  }
+}
 // Esaustivita' nella direzione opposta a `satisfies`.
 //
 // `satisfies` garantisce che nessun valore dell'interfaccia sia fuori dal
@@ -197,18 +241,78 @@ function HatSelector({
   )
 }
 
+// #25 — selettore di sorgente per l'azione "Genera": prompt testuale o URL.
+// Attivo solo quando actionId === 'generate'; aiModal resta sempre 'generate',
+// non commuta mai a 'generate-link' — è mode a decidere quale funzione della
+// Facade chiamare al submit (vedi handleGenerate).
+function GenerateSourceTabs({
+  mode,
+  onChange,
+}: {
+  mode: 'prompt' | 'link'
+  onChange: (m: 'prompt' | 'link') => void
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Sorgente della generazione"
+      className="flex gap-1 rounded-md border border-border bg-muted p-1"
+    >
+      <button
+        type="button"
+        role="tab"
+        id="generate-tab-prompt"
+        aria-selected={mode === 'prompt'}
+        aria-controls="generate-panel-prompt"
+        onClick={() => onChange('prompt')}
+        className={cn(
+          'flex-1 rounded-sm px-3 py-1.5 text-sm transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          mode === 'prompt'
+            ? 'bg-background font-medium text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        Da prompt
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="generate-tab-link"
+        aria-selected={mode === 'link'}
+        aria-controls="generate-panel-link"
+        onClick={() => onChange('link')}
+        className={cn(
+          'flex-1 rounded-sm px-3 py-1.5 text-sm transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          mode === 'link'
+            ? 'bg-background font-medium text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        Da link
+      </button>
+    </div>
+  )
+}
 
-type LastCall = { input: string; params: AiParams }
 
 export function AiActionDialog() {
   const actionId = useAiModal()
   const open = actionId !== null
   const action = actionId ? AI_ACTIONS[actionId] : null
 
-  const [params, setParams] = useState<AiParams>({})
-  const [input, setInput] = useState('')
-  const [validationError, setValidationError] = useState<string | null>(null)
-  const [lastCall, setLastCall] = useState<LastCall | null>(null)
+  const [uiState, dispatch] = useReducer(uiReducer, {
+    params: {},
+    input: '',
+    mode: 'prompt',
+    validationError: null,
+  })
+
+  const { params, input, mode, validationError } = uiState
+
+  const lastCall = useEditorStore((s) => s.lastCall)
+  const clearLastCall = useEditorStore((s) => s.clearLastCall)
 
   const streamedOutput = useStreamedOutput()
   const isGenerating = useIsGenerating()
@@ -216,19 +320,29 @@ export function AiActionDialog() {
   const displayed = useTypewriter(streamedOutput, isGenerating)
   const { start, abort } = useAiStream()
 
-  const isNoErrors = 
+  const isNoErrors =
     actionId === 'grammar' &&
     !isGenerating &&
     streamedOutput === NO_ERRORS_MARKER
 
-  // Resetta lo stato locale ogni volta che cambia l'azione aperta
   useEffect(() => {
     if (actionId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setParams(getDefaultParams(actionId))
-      setInput('')
-      setValidationError(null)
-      setLastCall(null)
+      const stored = useEditorStore.getState().lastCall
+      if (stored && stored.actionId === actionId) {
+        dispatch({
+          type: 'RESTORE_FROM_LAST_CALL',
+          payload: {
+            params: stored.params,
+            input: stored.input,
+            mode: stored.mode ?? 'prompt',
+          },
+        })
+      } else {
+        dispatch({
+          type: 'RESET_DEFAULT',
+          payload: { actionId },
+        })
+      }
     }
   }, [actionId])
 
@@ -240,75 +354,113 @@ export function AiActionDialog() {
 
   const sameAsLast =
     lastCall !== null &&
+    lastCall.actionId === actionId &&
     lastCall.input === currentInput &&
+    lastCall.mode === mode &&
     JSON.stringify(lastCall.params) === JSON.stringify(params)
 
-  const inputTooShort = currentInput.length < action.minLength
-  const inputTooLong =
-    action.maxLength !== null && currentInput.length > action.maxLength
+  const effectiveMinLength =
+    actionId === 'generate' && mode === 'link'
+      ? AI_ACTIONS['generate-link'].minLength
+      : action.minLength
+  const effectiveMaxLength =
+    actionId === 'generate' && mode === 'link'
+      ? AI_ACTIONS['generate-link'].maxLength
+      : action.maxLength
 
+  const inputTooShort = currentInput.length < effectiveMinLength
+  const inputTooLong =
+    effectiveMaxLength !== null && currentInput.length > effectiveMaxLength
+
+  const handleModeChange = (next: 'prompt' | 'link') => {
+    dispatch({ type: 'SET_MODE', payload: next })
+    dispatch({ type: 'SET_INPUT', payload: '' })
+    dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
+  }
 
   const handleGenerate = () => {
-    setValidationError(null)
+    dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
     if (inputTooShort) {
-      setValidationError(
-        `Servono almeno ${action.minLength} caratteri di testo.`,
-      )
+      dispatch({
+        type: 'SET_VALIDATION_ERROR',
+        payload: actionId === 'generate' && mode === 'link'
+          ? 'Inserisci un URL.'
+          : `Servono almeno ${effectiveMinLength} caratteri di testo.`,
+      })
       return
     }
     if (inputTooLong) {
-      setValidationError(
-        `Il testo supera il massimo di ${action.maxLength} caratteri ` +
+      dispatch({
+        type: 'SET_VALIDATION_ERROR',
+        payload: `Il testo supera il massimo di ${effectiveMaxLength} caratteri ` +
           `(attuali: ${currentInput.length}). Riducilo o elaboralo in più parti.`,
-      )
+      })
       return
     }
     if (actionId === 'critique' && !params.hat) {
-      setValidationError('Seleziona un cappello per l\'analisi.')
+      dispatch({
+        type: 'SET_VALIDATION_ERROR',
+        payload: 'Seleziona un cappello per l\'analisi.',
+      })
       return
     }
 
-   setLastCall({ input: currentInput, params: { ...params } })
-  useEditorStore.setState({ streamedOutput: '', errorMessage: null })
+    useEditorStore.setState({ streamedOutput: '', errorMessage: null })
 
-  let streamFn: () => AsyncIterable<string>
-  switch (actionId) {
-    case 'summarize':
-      streamFn = () => api.summarize(currentInput, params.length ?? 'medio')
-      break
-    case 'translate':
-      streamFn = () => api.translate(currentInput, params.target_language ?? LANGUAGES[0].value)
-      break
-    case 'rewrite':
-      streamFn = () => api.rewrite(currentInput, params.style ?? STYLES[0].value)
-      break
-    case 'grammar':
-      streamFn = () => api.grammar(currentInput)
-      break
-    case 'critique':
-      streamFn = () => api.critique(currentInput, params.hat!)
-      break
-    case 'generate':
-      streamFn = () => api.generate(currentInput, params.length ?? 'medio')
-      break
-    case 'generate-link':
-      streamFn = () => api.generateFromLink(currentInput, params.length ?? 'medio')
-      break
-    default:
+    if (sameAsLast && lastCall) {
+      void start(lastCall.execute)
       return
-  }
+    }
 
-  void start(streamFn)
+    let streamFn: () => AsyncIterable<string>
+    switch (actionId) {
+      case 'summarize':
+        streamFn = () => api.summarize(currentInput, params.length ?? 'medio')
+        break
+      case 'translate':
+        streamFn = () => api.translate(currentInput, params.target_language ?? LANGUAGES[0].value)
+        break
+      case 'rewrite':
+        streamFn = () => api.rewrite(currentInput, params.style ?? STYLES[0].value)
+        break
+      case 'grammar':
+        streamFn = () => api.grammar(currentInput)
+        break
+      case 'critique':
+        streamFn = () => api.critique(currentInput, params.hat!)
+        break
+      case 'generate':
+        streamFn = mode === 'link'
+          ? () => api.generateFromLink(currentInput, params.length ?? 'medio')
+          : () => api.generate(currentInput, params.length ?? 'medio')
+        break
+      case 'generate-link':
+        streamFn = () => api.generateFromLink(currentInput, params.length ?? 'medio')
+        break
+      default:
+        return
+    }
+
+    const newCall: LastCall = {
+      actionId,
+      input: currentInput,
+      params: { ...params },
+      mode,
+      execute: streamFn,
+    }
+    useEditorStore.getState().setLastCall(newCall)
+
+    void start(streamFn)
   }
 
   const handleAccept = () => {
-    setLastCall(null)
+    clearLastCall()
     useEditorStore.getState().insertOutputIntoNote(action.insertMode)
   }
 
   const handleReject = () => {
     abort()
-    setLastCall(null)
+    clearLastCall()
     useEditorStore.getState().discardOutput()
   }
 
@@ -317,19 +469,62 @@ export function AiActionDialog() {
     useEditorStore.getState().finishStreaming()
   }
 
-
   const renderInputSlot = () => {
+    if (actionId === 'generate') {
+      return (
+        <div className="flex flex-col gap-3">
+          <GenerateSourceTabs mode={mode} onChange={handleModeChange} />
+          {mode === 'prompt' ? (
+            <label
+              id="generate-panel-prompt"
+              role="tabpanel"
+              aria-labelledby="generate-tab-prompt"
+              className="flex flex-col gap-1.5"
+            >
+              <span className="text-sm font-medium text-foreground">Istruzioni / Contesto</span>
+              <textarea
+                value={input}
+                onChange={(e) => {
+                  dispatch({ type: 'SET_INPUT', payload: e.target.value })
+                  dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
+                }}
+                rows={4}
+                placeholder="Descrivi cosa generare..."
+                className="min-h-[88px] rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+          ) : (
+            <label
+              id="generate-panel-link"
+              role="tabpanel"
+              aria-labelledby="generate-tab-link"
+              className="flex flex-col gap-1.5"
+            >
+              <span className="text-sm font-medium text-foreground">URL</span>
+              <input
+                type="url"
+                value={input}
+                onChange={(e) => {
+                  dispatch({ type: 'SET_INPUT', payload: e.target.value })
+                  dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
+                }}
+                placeholder="https://..."
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+          )}
+        </div>
+      )
+    }
     if (action.source === 'prompt') {
       return (
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-foreground">
-            Istruzioni / Contesto
-          </span>
+          <span className="text-sm font-medium text-foreground">Istruzioni / Contesto</span>
           <textarea
             value={input}
             onChange={(e) => {
-              setInput(e.target.value)
-              setValidationError(null)
+              dispatch({ type: 'SET_INPUT', payload: e.target.value })
+              dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
             }}
             rows={4}
             placeholder="Descrivi cosa generare..."
@@ -346,8 +541,8 @@ export function AiActionDialog() {
             type="url"
             value={input}
             onChange={(e) => {
-              setInput(e.target.value)
-              setValidationError(null)
+              dispatch({ type: 'SET_INPUT', payload: e.target.value })
+              dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
             }}
             placeholder="https://..."
             className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -355,9 +550,8 @@ export function AiActionDialog() {
         </label>
       )
     }
-    return null 
+    return null
   }
-
 
   const renderParamSlots = () => {
     switch (actionId) {
@@ -369,7 +563,7 @@ export function AiActionDialog() {
             label="Lunghezza output"
             options={LENGTHS}
             value={params.length ?? 'medio'}
-            onChange={(v) => setParams((p) => ({ ...p, length: v }))}
+            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, length: v } })}
           />
         )
       case 'translate':
@@ -378,7 +572,7 @@ export function AiActionDialog() {
             label="Lingua di destinazione"
             options={LANGUAGES}
             value={params.target_language ?? LANGUAGES[0].value}
-            onChange={(v) => setParams((p) => ({ ...p, target_language: v }))}
+            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, target_language: v } })}
           />
         )
       case 'rewrite':
@@ -387,15 +581,15 @@ export function AiActionDialog() {
             label="Stile"
             options={STYLES}
             value={params.style ?? STYLES[0].value}
-            onChange={(v) => setParams((p) => ({ ...p, style: v }))}
+            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, style: v } })}
           />
         )
       case 'critique':
         return (
           <HatSelector
             value={params.hat ?? null}
-            onChange={(v) => setParams((p) => ({ ...p, hat: v }))}
-            />
+            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, hat: v } })}
+          />
         )
       case 'grammar':
         return null
@@ -406,8 +600,10 @@ export function AiActionDialog() {
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
-        if (!next) handleReject()
-      }}
+    if (!next) {
+      useEditorStore.getState().setAiModal(null)
+    }
+    }}
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
@@ -433,10 +629,10 @@ export function AiActionDialog() {
             )}
           >
             {isNoErrors ? (
-               <p className="text-sm text-muted-foreground">Nessun errore rilevato.</p>
-              ) : (
-                <MarkdownView className="prose-sm">{displayed}</MarkdownView>
-              )}
+              <p className="text-sm text-muted-foreground">Nessun errore rilevato.</p>
+            ) : (
+              <MarkdownView className="prose-sm">{displayed}</MarkdownView>
+            )}
           </div>
 
           {(validationError !== null || errorMessage !== null) && (
