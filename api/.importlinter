@@ -1,0 +1,37 @@
+[importlinter]
+root_package = app
+include_external_packages = True
+
+[importlinter:contract:core-indipendente]
+name = Il core non conosce l'infrastruttura né i framework
+type = forbidden
+source_modules = app.core
+forbidden_modules =
+    fastapi
+    httpx
+    tavily
+    pydantic_settings
+    app.infrastructure
+    app.routes
+
+[importlinter:contract:layers]
+name = Direzione delle dipendenze
+type = layers
+layers =
+    app.routes
+    app.infrastructure
+    app.core
+
+[importlinter:contract:adapter-indipendente]
+name = Gli adattatori non si importano tra loro
+type = independence
+modules =
+    app.infrastructure.adapters.tavily_extractor
+    app.infrastructure.adapters.litellm_client
+    app.infrastructure.adapters.sse_streaming
+
+[importlinter:contract:core-non-importa-settings]
+name = Il core non importa direttamente app.settings
+type = forbidden
+source_modules = app.core
+forbidden_modules = app.settings
