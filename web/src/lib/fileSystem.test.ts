@@ -86,6 +86,24 @@ describe('openNoteFromFile — File System Access API (Chrome, Edge)', () => {
 
     await expect(openNoteFromFile()).rejects.toThrow('disco pieno')
   })
+
+  it('funziona anche fuori da secure context, dove randomUUID non esiste', async () => {
+    //R-85-F-Ob su HTTP non-localhost: `crypto.randomUUID` e' definita **solo
+    //in secure context**, e l'import la chiamava diretta. Li' non mancava la
+    //gestione dell'errore: il caricamento da file si rompeva del tutto.
+    const cryptoReale = globalThis.crypto
+    vi.stubGlobal('crypto', {
+      getRandomValues: (arr: Uint8Array<ArrayBuffer>) => cryptoReale.getRandomValues(arr),
+    })
+    vi.stubGlobal('showOpenFilePicker', vi.fn().mockResolvedValue([
+      { getFile: () => Promise.resolve(new File(['# Appunti'], 'appunti.md')) },
+    ]))
+
+    const risultato = await openNoteFromFile()
+
+    expect(risultato?.title).toBe('appunti')
+    expect(risultato?.id).toBeTruthy()
+  })
 })
 
 describe('openNoteFromFile — fallback senza File System Access API (Firefox)', () => {
