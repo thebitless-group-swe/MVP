@@ -7,7 +7,7 @@ import { useEditorStore } from './useEditorStore'
 type NotesState = {
   list: Note[]
   currentId: string | null
-  createEmpty: () => Note
+  createEmpty: (title?: string) => Note
   select: (id: string) => void
   updateCurrent: (patch: Partial<Pick<Note, 'title' | 'content'>>) => void
   deleteNote: (id: string) => void
@@ -21,12 +21,27 @@ export const useNotesStore = create<NotesState>()(
       currentId: null,
 
       /**
-       * Crea una nota vuota, o non lascia traccia di averci provato.
+       * Crea una nota con il titolo indicato dall'utente, o non lascia traccia
+       * di averci provato.
        *
-       * UC75 chiede due cose a chi gestisce un errore di creazione: informare
-       * l'utente — e quello tocca al chiamante, che ha l'interfaccia — e
-       * «ripristinare lo stato precedente per evitare perdite di dati», che
-       * tocca a qui. Da cui le due precauzioni:
+       * **Il titolo lo fornisce chi chiama.** R-114-F-Ob (UC74.3) impone che
+       * sia *chiesto* in fase di creazione: prima qui c'era `'Senza titolo'`
+       * assegnato d'ufficio, che e' il difetto che questo parametro elimina.
+       * La ricaduta resta, ma solo per la stringa vuota, e sta qui e non nel
+       * chiamante perche' il punto di verita' dev'essere uno solo. Il `trim()`
+       * e' la stessa convenzione gia' adottata da `renameNote` in
+       * `lib/fileSystem.ts`.
+       *
+       * Il parametro ha un valore predefinito perche' non tutti i punti di
+       * creazione passano per la richiesta del titolo: chi chiama senza
+       * argomenti ottiene la nota «Senza titolo» di prima, che e' il
+       * comportamento che i test di persistenza e di secure context danno per
+       * scontato.
+       *
+       * **Il resto risponde a UC75**, che chiede due cose a chi gestisce un
+       * errore di creazione: informare l'utente — e quello tocca al chiamante,
+       * che ha l'interfaccia — e «ripristinare lo stato precedente per evitare
+       * perdite di dati», che tocca a qui. Da cui le due precauzioni:
        *
        * 1. l'id si genera **prima** di ogni mutazione, cosi' un suo fallimento
        *    esce senza aver toccato nulla;
@@ -40,7 +55,7 @@ export const useNotesStore = create<NotesState>()(
        * insieme la nota comparire nell'elenco, con l'editor ancora sul
        * contenuto della nota precedente.
        */
-      createEmpty: () => {
+      createEmpty: (title = '') => {
         const id = newId()
         const precedente = { list: get().list, currentId: get().currentId }
 
@@ -57,7 +72,7 @@ export const useNotesStore = create<NotesState>()(
           const now = Date.now()
           const note: Note = {
             id,
-            title: 'Senza titolo',
+            title: title.trim() || 'Senza titolo',
             content: '',
             createdAt: now,
             updatedAt: now,
