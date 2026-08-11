@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from app.dependencies import get_content_extractor, get_llm_client
@@ -29,7 +28,6 @@ def test_generate_returns_sse(
         app.dependency_overrides.clear()
 
 
-@pytest.mark.usefixtures("content_extractor_override")
 def test_generate_from_link_invalid_url_returns_4xx(client: TestClient) -> None:
     response = client.post(
         "/api/generate-from-link", json={"url": "ftp://example.com"}
