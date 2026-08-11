@@ -172,7 +172,7 @@ export function Sidebar() {
     return (
       <aside
         aria-label="Navigazione principale"
-        className="flex h-full w-12 shrink-0 flex-col items-center border-r border-border bg-card py-4"
+        className="flex h-full w-12 shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar py-4"
       >
         <button
           type="button"
@@ -189,7 +189,7 @@ export function Sidebar() {
   return (
     <aside
       aria-label="Navigazione principale"
-      className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-card"
+      className="flex h-full w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar"
     >
       <div className="flex items-center justify-between px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
