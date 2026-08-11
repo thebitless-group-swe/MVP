@@ -18,8 +18,20 @@ const { mockStart, mockAbort, capturedFn } = vi.hoisted(() => ({
     // Salva la funzione per poterla ispezionare dopo
     capturedFn.value = fn
   }),
-  mockAbort: vi.fn(),
-  capturedFn: { value: null as (() => AsyncIterable<string>) | null },
+  //Doppio fedele di `abort()`: annulla il controller in corso, lo sgancia e
+  //spegne l'indicatore di attesa — cio' che il vero hook fa, osservato da
+  //fuori. Un doppio inerte faceva passare il test dell'Interrompi solo perche'
+  //il componente chiamava `finishStreaming()` una seconda volta: il doppio
+  //mentiva, e il codice di produzione pagava il conto con una riga ridondante.
+  mockAbort: vi.fn(() => {
+    const stato = useEditorStore.getState()
+    stato._abortController?.abort()
+    stato._setAbortController(null)
+    stato.finishStreaming()
+  }),
+  capturedFn: {
+    value: null as ((signal: AbortSignal) => AsyncIterable<string>) | null,
+  },
 }))
 
 // Mock di useAiStream con la nuova firma
@@ -104,8 +116,8 @@ describe('AiActionDialog — body corretto', () => {
     expect(fn).toBeInstanceOf(Function)
 
     // Esegui la funzione per verificare che chiami la Facade corretta
-    await fn()
-    expect(api.summarize).toHaveBeenCalledWith(ACTIVE_TEXT, 'medio')
+    await fn(new AbortController().signal)
+    expect(api.summarize).toHaveBeenCalledWith(ACTIVE_TEXT, 'medio', expect.any(AbortSignal))
   })
 
   it('generate: invia prompt e length tramite Facade', async () => {
@@ -120,8 +132,8 @@ describe('AiActionDialog — body corretto', () => {
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
-    await fn()
-    expect(api.generate).toHaveBeenCalledWith('Scrivi un articolo sulla Luna', 'medio')
+    await fn(new AbortController().signal)
+    expect(api.generate).toHaveBeenCalledWith('Scrivi un articolo sulla Luna', 'medio', expect.any(AbortSignal))
   })
 })
 
@@ -261,8 +273,8 @@ describe('AiActionDialog — testo insufficiente (R-81)', () => {
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
-    await fn()
-    expect(api.summarize).toHaveBeenCalledWith(alLimite, 'medio')
+    await fn(new AbortController().signal)
+    expect(api.summarize).toHaveBeenCalledWith(alLimite, 'medio', expect.any(AbortSignal))
   })
 
   it('generate: il prompt oltre il massimo non parte', async () => {
@@ -308,8 +320,8 @@ describe('AiActionDialog — lingue di destinazione (R-58-F-Ob)', () => {
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
-    await fn()
-    expect(api.translate).toHaveBeenCalledWith(ACTIVE_TEXT, 'inglese')
+    await fn(new AbortController().signal)
+    expect(api.translate).toHaveBeenCalledWith(ACTIVE_TEXT, 'inglese', expect.any(AbortSignal))
   })
 })
 
@@ -333,8 +345,8 @@ describe('AiActionDialog — stili di riscrittura (R-60-F-Ob)', () => {
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
-    await fn()
-    expect(api.rewrite).toHaveBeenCalledWith(ACTIVE_TEXT, 'accademico')
+    await fn(new AbortController().signal)
+    expect(api.rewrite).toHaveBeenCalledWith(ACTIVE_TEXT, 'accademico', expect.any(AbortSignal))
   })
 })
 
@@ -401,8 +413,8 @@ describe('AiActionDialog — critique (cappelli)', () => {
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
-    await fn()
-    expect(api.critique).toHaveBeenCalledWith(ACTIVE_TEXT, valore)
+    await fn(new AbortController().signal)
+    expect(api.critique).toHaveBeenCalledWith(ACTIVE_TEXT, valore, expect.any(AbortSignal))
   })
 
   it('senza cappello → nessuna fetch, mostra alert', async () => {
@@ -441,3 +453,23 @@ describe('AiActionDialog — Rigenera persistente (#37)', () => {
     expect(useEditorStore.getState().aiModal).toBeNull()
     })
   })
+
+describe('AiActionDialog — chiusura durante la generazione (UC71)', () => {
+  it('chiudere la modale annulla lo stream invece di lasciarlo orfano', async () => {
+    const controller = new AbortController()
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'summarize',
+        isGenerating: true,
+        _abortController: controller,
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState().aiModal).toBeNull()
+  })
+})

@@ -21,7 +21,10 @@ export type LastCall = {
   params: AiParams
   mode?: 'prompt' | 'link'
   actionId: AiActionId
-  execute: () => AsyncIterable<string>
+  //Il signal arriva per parametro a ogni esecuzione, e non catturato nella
+  //chiusura: «Rigenera» riesegue questa stessa funzione, e un signal catturato
+  //alla creazione sarebbe gia' annullato al secondo giro.
+  execute: (signal: AbortSignal) => AsyncIterable<string>
 }
 
 interface EditorState {
@@ -147,7 +150,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   _setAbortController: (c) => set({ _abortController: c }),
   abortStream: () => {
     get()._abortController?.abort()
-    set({_abortController: null})
+    //L'indicatore di attesa si spegne qui, non «quando il loop se ne accorge».
+    //R-109-F-De parla della durata percepita dall'utente, e i due comandi di
+    //annullamento — quello della TopBar, che passa di qui, e quello della
+    //modale, che passa dall'hook — devono comportarsi allo stesso modo.
+    set({ _abortController: null, isGenerating: false })
   },
 }))
 

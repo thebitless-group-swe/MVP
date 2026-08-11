@@ -8,33 +8,41 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
  * Ogni metodo ritorna un AsyncIterable<string>.
  */
 export const api = {
-  summarize: (text: string, length: Length = 'medio') =>
-    stream('/api/summarize', { text, length }),
+  summarize: (text: string, length: Length = 'medio', signal?: AbortSignal) =>
+    stream('/api/summarize', { text, length }, signal),
 
-  translate: (text: string, target_language: Language) =>
-    stream('/api/translate', { text, target_language }),
+  translate: (text: string, target_language: Language, signal?: AbortSignal) =>
+    stream('/api/translate', { text, target_language }, signal),
 
-  rewrite: (text: string, style: Style) =>
-    stream('/api/rewrite', { text, style }),
+  rewrite: (text: string, style: Style, signal?: AbortSignal) =>
+    stream('/api/rewrite', { text, style }, signal),
 
-  grammar: (text: string) =>
-    stream('/api/grammar', { text }),
+  grammar: (text: string, signal?: AbortSignal) =>
+    stream('/api/grammar', { text }, signal),
 
-  critique: (text: string, hat: Hat) =>
-    stream('/api/critique', { text, hat }),
+  critique: (text: string, hat: Hat, signal?: AbortSignal) =>
+    stream('/api/critique', { text, hat }, signal),
 
-  generate: (prompt: string, length: Length = 'medio') =>
-    stream('/api/generate', { prompt, length }),
+  generate: (prompt: string, length: Length = 'medio', signal?: AbortSignal) =>
+    stream('/api/generate', { prompt, length }, signal),
 
-  generateFromLink: (url: string, length: Length = 'medio') =>
-    stream('/api/generate-from-link', { url, length }),
+  generateFromLink: (url: string, length: Length = 'medio', signal?: AbortSignal) =>
+    stream('/api/generate-from-link', { url, length }, signal),
 }
 
-async function* stream(endpoint: string, body: unknown): AsyncIterable<string> {
+async function* stream(
+  endpoint: string,
+  body: unknown,
+  signal?: AbortSignal,
+): AsyncIterable<string> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    //UC71 post-condizione 1. Senza questa riga annullare fermava il consumo dei
+    //chunk ma lasciava la richiesta aperta: il backend non vedeva alcuna
+    //disconnessione e continuava a produrre lo stream fino a [DONE].
+    signal,
   })
 
   if (!response.ok) {
@@ -58,10 +66,19 @@ async function* stream(endpoint: string, body: unknown): AsyncIterable<string> {
 
   const reader = response.body.getReader()
 
-  for await (const event of parseSseStream(reader)) {
-    if (event.type === 'error') {
-      throw new Error(event.message)
+  try {
+    for await (const event of parseSseStream(reader)) {
+      if (event.type === 'error') {
+        throw new Error(event.message)
+      }
+      yield event.data
     }
-    yield event.data
+  } finally {
+    //Il `signal` copre l'annullamento esplicito; questo copre ogni altra uscita
+    //anticipata del consumatore — un `break`, un `return`, un errore a valle —
+    //che chiude questo generatore senza toccare il corpo della risposta. Il
+    //`catch` inerte serve perche' su uno stream gia' annullato `cancel()`
+    //rifiuta, e un rifiuto qui maschererebbe l'errore vero in uscita.
+    await reader.cancel().catch(() => {})
   }
 }
