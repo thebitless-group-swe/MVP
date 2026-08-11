@@ -50,7 +50,7 @@ class TestLinkRequestUrlValidation:
         assert LinkRequest(url=url)
 
 
-@pytest.mark.usefixtures("dummy_override", "content_extractor_override")
+@pytest.mark.usefixtures("dummy_override")
 class TestGenerateFromLinkErrors:
     @pytest.mark.parametrize(
         "url", ["ftp://example.com", "non-un-url", "javascript:alert(1)"]

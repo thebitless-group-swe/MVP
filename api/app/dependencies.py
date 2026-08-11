@@ -18,6 +18,7 @@ Il trasloco si e' completato con la promozione dei prompt in
 `core/domain/prompts/`: `app/llm/` conteneva ormai il solo `prompts.py` e non
 esiste piu'. Nessun package del backend prende ancora nome da una tecnologia.
 """
+import logging
 from functools import lru_cache
 
 from fastapi import HTTPException
@@ -28,10 +29,72 @@ from .infrastructure.adapters.litellm_client import LiteLLMClient
 from .infrastructure.adapters.tavily_extractor import TavilyExtractor
 from .settings import Settings
 
+logger = logging.getLogger(__name__)
+
 _CHIAVE_MANCANTE_DETAIL = (
     "Servizio di estrazione contenuti temporaneamente non disponibile "
     "(chiave mancante)."
 )
+
+_LLM_CHIAVE_MANCANTE_DETAIL = (
+    "Servizio di elaborazione temporaneamente non disponibile (chiave mancante)."
+)
+
+#Chiavi la cui assenza impedisce l'avvio del processo.
+#
+#Ce n'e' una sola, e l'asimmetria con TAVILY_API_KEY e' una decisione, non una
+#dimenticanza: senza LITELLM_API_KEY nessuna delle sette funzioni AI puo'
+#funzionare, quindi un processo che parte comunque accetta richieste sapendo di
+#non poterne servire nessuna. TAVILY_API_KEY serve invece al solo
+#/api/generate-from-link: la sua assenza degrada un endpoint su otto, e per
+#quello il 503 per richiesta e' la risposta proporzionata. Il test
+#`test_senza_tavily_il_processo_parte_lo_stesso` fissa questa scelta, cosi' che
+#invertirla richieda di cambiare un'asserzione invece che scivolarci dentro.
+_CHIAVI_OBBLIGATORIE_AL_BOOT = ("LITELLM_API_KEY",)
+
+
+def verifica_chiavi_obbligatorie() -> None:
+    """Rifiuta l'avvio se manca una chiave senza cui il processo non serve a nulla.
+
+    **Perche' al boot e non per richiesta.** Una chiave mancante non e' una
+    condizione di runtime: e' nota quando il processo parte. Finche' il
+    controllo viveva solo nei provider, un deploy senza chiave accettava
+    richieste per poi rifiutarle una a una — e su /api/generate-from-link
+    produceva anche un effetto collaterale spiacevole, perche' FastAPI risolve
+    le dipendenze **prima** di validare il corpo: una richiesta con URL
+    malformato riceveva 503 invece del 422 stabilito dalla #04.
+
+    **Perche' qui e non in `main.py`.** Stesso motivo di `close_llm_client` e
+    `close_content_extractor` qui sotto: quale chiave serva a quale provider e'
+    conoscenza del composition root. Il lifespan chiama e non sa.
+
+    **Perche' qui e non come validatore su `Settings`.** `export_openapi.py`
+    importa `app.main`, che costruisce le impostazioni a import-time per il
+    CORS: un validatore farebbe fallire l'esportazione del contratto OpenAPI in
+    CI, dove le chiavi non ci sono, prima ancora di arrivare ai test.
+
+    **Sul messaggio.** Nomina la variabile d'ambiente, cioe' fa l'opposto di
+    quanto R-110-F-Ob impone alle risposte HTTP. Non e' una contraddizione: li'
+    il destinatario e' l'utente e i dettagli tecnici sono rumore o rischio, qui
+    e' chi fa il deploy e il nome esatto della variabile e' l'unica cosa utile.
+    """
+    settings = get_settings()
+    #Tutte le mancanti in un colpo solo: scoprirle una alla volta, a forza di
+    #riavvii falliti, e' il modo peggiore di configurare un ambiente.
+    mancanti = [
+        nome
+        for nome in _CHIAVI_OBBLIGATORIE_AL_BOOT
+        if not getattr(settings, nome.lower(), "")
+    ]
+    if not mancanti:
+        return
+
+    messaggio = (
+        "Avvio interrotto: configurazione incompleta. "
+        f"Variabili d'ambiente obbligatorie assenti o vuote: {', '.join(mancanti)}."
+    )
+    logger.error(messaggio)
+    raise RuntimeError(messaggio)
 
 
 #lru cache esegue la funzione e memorizza il risultato nella cache;
@@ -58,6 +121,23 @@ def get_settings() -> Settings:
 #Per info su @lru_cache vedi get_settings qui sopra
 @lru_cache
 def get_llm_client() -> LLMClient:
+    """Costruisce l'adattatore LLM a partire dalla configurazione.
+
+    Con la chiave assente solleva 503 e non 500, esattamente come
+    `get_content_extractor`: una configurazione incompleta e' un servizio
+    indisponibile, non un errore di programmazione. Prima i due provider si
+    comportavano in modo opposto davanti allo stesso tipo di guasto — l'uno
+    503, l'altro un 500 con stacktrace — e la differenza non era motivata da
+    nulla.
+
+    In un processo avviato regolarmente questa guardia non puo' scattare, perche'
+    `verifica_chiavi_obbligatorie` avrebbe gia' impedito il boot. Resta come
+    difesa in profondita': l'app e' costruibile anche senza lifespan — i test
+    lo fanno di continuo, ed e' cosi' che `export_openapi` importa il contratto.
+    """
+    api_key = get_settings().litellm_api_key
+    if not api_key:
+        raise HTTPException(status_code=503, detail=_LLM_CHIAVE_MANCANTE_DETAIL)
     return LiteLLMClient(get_settings())
 
 
@@ -77,21 +157,30 @@ def get_content_extractor() -> ContentExtractor:
     return TavilyExtractor(api_key=api_key)
 
 
-#Le due chiusure sono asimmetriche perche' lo sono i due problemi, non per
-#distrazione: `get_llm_client` non ha modi di fallire, quindi si puo' invocare
-#sempre; `get_content_extractor` solleva 503 con la chiave assente, quindi va
-#interrogato attraverso la cache. Livellare le due forme — aggiungendo una
-#guardia anche alla prima — nasconderebbe la sola differenza che conta fra i
-#due provider. Il lifespan chiama entrambe e non sa niente di tutto questo.
+#Le due chiusure hanno ora la stessa forma, e prima no.
+#
+#Il commento che stava qui argomentava che l'asimmetria fosse voluta, perche'
+#«get_llm_client non ha modi di fallire, quindi si puo' invocare sempre».
+#Quella frase descriveva uno stato, non un principio, e la guardia 503 aggiunta
+#qui sopra l'ha resa falsa: adesso invocare `get_llm_client()` a cache vuota e
+#senza chiave solleverebbe, e lo shutdown fallirebbe in ogni ambiente privo di
+#configurazione — i test per primi. E' esattamente la trappola che
+#`close_content_extractor` gia' evitava, arrivata anche all'altro provider.
+#Il lifespan chiama entrambe e non sa niente di tutto questo.
 async def close_llm_client() -> None:
-    """Chiude il client LLM.
+    """Chiude il client LLM, se ne e' stato costruito uno.
 
     Vive qui e non nel lifespan per la stessa ragione di
     `close_content_extractor`.
     """
-    #Se nessuna richiesta e' passata, questa e' l'unica costruzione del client:
-    #lo si crea per chiuderlo subito. Costa una `httpx.AsyncClient` mai usata, e
-    #il provider non puo' fallire, quindi non vale una guardia sulla cache.
+    #Si interroga la cache invece di chiamare il provider: a cache vuota e senza
+    #chiave la chiamata solleverebbe 503, facendo fallire l'uscita del processo.
+    #Con la cache piena e' un hit, non riesegue il corpo e non puo' sollevare.
+    #Effetto collaterale gradito: non si fabbrica piu' una `httpx.AsyncClient`
+    #mai usata solo per poterla chiudere.
+    if not get_llm_client.cache_info().currsize:
+        return
+
     client = get_llm_client()
     #La porta `LLMClient` non dichiara `aclose`, e non deve: il ciclo di vita e'
     #dell'adattatore. Conoscere la classe concreta e' mestiere del composition

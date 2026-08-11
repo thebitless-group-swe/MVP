@@ -12,6 +12,7 @@ precedente gia' adottato in test_tavily_extractor.py: la risorsa da chiudere e'
 incapsulata per costruzione, e verificarne la chiusura richiede di guardarci.
 """
 
+import logging
 from collections.abc import Iterator
 
 import pytest
@@ -146,3 +147,81 @@ class TestChiusuraDellAdattatoreTavily:
             pass
 
         assert invocazioni == ["aclose"]
+
+
+class TestValidazioneDelleChiaviAlBoot:
+    """Una chiave mancante si scopre dal log di avvio, non dal primo utente.
+
+    Questi test stanno qui e non in un file proprio per la stessa ragione per
+    cui ci sta il resto: `with TestClient(app)` esegue il lifespan, e la suite
+    tiene tutte le sue occorrenze in un file solo. Spargerle significherebbe
+    che una modifica al lifespan rompe test sparsi senza causa evidente.
+    """
+
+    def test_senza_litellm_il_processo_non_parte(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Senza LITELLM_API_KEY nessuna delle sette funzioni AI puo' servire.
+
+        Un'API che accetta richieste sapendo di non poterne soddisfare nessuna
+        sta rispondendo a una domanda che non avrebbe dovuto ricevere.
+        """
+        monkeypatch.setenv("LITELLM_API_KEY", "")
+        get_settings.cache_clear()
+
+        with pytest.raises(RuntimeError):
+            with TestClient(app):
+                pass
+
+    def test_il_messaggio_nomina_la_variabile_mancante(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Il destinatario e' chi fa il deploy, non l'utente.
+
+        E' l'opposto di R-110-F-Ob, che vieta i dettagli tecnici nelle risposte
+        HTTP: li' il nome di una variabile d'ambiente sarebbe rumore o rischio,
+        qui e' l'unica informazione che rende l'errore azionabile.
+        """
+        monkeypatch.setenv("LITELLM_API_KEY", "")
+        get_settings.cache_clear()
+
+        with pytest.raises(RuntimeError) as errore:
+            with TestClient(app):
+                pass
+
+        assert "LITELLM_API_KEY" in str(errore.value)
+
+    def test_il_fallimento_finisce_nel_log(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Sollevare non basta: la DoD chiede che «il log dica quale manca».
+
+        Chi fa il deploy legge il log del container, non lo stacktrace.
+        """
+        monkeypatch.setenv("LITELLM_API_KEY", "")
+        get_settings.cache_clear()
+
+        with caplog.at_level(logging.ERROR, logger="app.dependencies"):
+            with pytest.raises(RuntimeError):
+                with TestClient(app):
+                    pass
+
+        assert any("LITELLM_API_KEY" in record.message for record in caplog.records)
+
+    def test_senza_tavily_il_processo_parte_lo_stesso(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """La degradazione graduale e' una decisione, e va fissata da un test.
+
+        TAVILY_API_KEY serve al solo /api/generate-from-link: la sua assenza
+        toglie un endpoint su otto, non il prodotto. Per quel caso la risposta
+        proporzionata resta il 503 per richiesta, coperto da
+        test_content_extractor_di.py. Se un domani si decidesse di renderla
+        obbligatoria, e' questa asserzione a doversi rompere — invece che la
+        scelta a cambiare in silenzio.
+        """
+        monkeypatch.setenv("TAVILY_API_KEY", "")
+        get_settings.cache_clear()
+
+        with TestClient(app) as attivo:
+            assert attivo.get("/").status_code == 200

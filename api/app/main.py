@@ -18,7 +18,12 @@ from .api.routes import (
     translate_router,
 )
 from .api.schemas import ErrorResponse
-from .dependencies import close_content_extractor, close_llm_client, get_settings
+from .dependencies import (
+    close_content_extractor,
+    close_llm_client,
+    get_settings,
+    verifica_chiavi_obbligatorie,
+)
 
 
 @asynccontextmanager
@@ -36,9 +41,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ciascuno dei due, e perche' le due chiusure abbiano forma diversa, e'
     argomentato in `dependencies.py` accanto alle funzioni.
     """
-    #Startup deliberatamente vuoto. E' qui che andrebbe la validazione delle
-    #chiavi obbligatorie al boot: oggi una chiave mancante si scopre alla prima
-    #richiesta, cioe' dal primo utente invece che dal log di avvio.
+    #Lo startup non e' piu' vuoto: una chiave mancante si scopre dal log di
+    #avvio, non dal primo utente. Sollevare qui fa uscire uvicorn invece di
+    #lasciarlo servire richieste che non puo' soddisfare. *Cosa* sia
+    #obbligatorio lo decide `dependencies.py`, che e' il modulo che sa quale
+    #chiave serve a quale provider.
+    verifica_chiavi_obbligatorie()
+
     yield
 
     await close_llm_client()
