@@ -161,3 +161,37 @@ describe('api — risposta ok ma inutilizzabile', () => {
     await expect(raccogli(api.grammar('t'))).rejects.toThrow(STREAM_INTERRUPTED_MESSAGE)
   })
 })
+
+describe('api — annullamento (UC71)', () => {
+  it('inoltra il signal alla fetch', async () => {
+    const chiamata = intercettaFetch(rispostaOk('data: ciao\n\ndata: [DONE]\n\n'))
+    const controller = new AbortController()
+
+    await raccogli(api.summarize('testo di prova', 'medio', controller.signal))
+
+    expect(chiamata.mock.calls[0][1]).toMatchObject({ signal: controller.signal })
+  })
+
+  it('interrompere il consumo cancella il corpo della risposta', async () => {
+    let cancellato = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: uno\n\n'))
+      },
+      cancel() {
+        cancellato = true
+      },
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, body } as unknown as Response),
+    )
+
+    for await (const pezzo of api.summarize('testo di prova')) {
+      expect(pezzo).toBe('uno')
+      break
+    }
+
+    expect(cancellato).toBe(true)
+  })
+})

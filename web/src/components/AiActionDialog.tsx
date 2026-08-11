@@ -412,30 +412,33 @@ export function AiActionDialog() {
       return
     }
 
-    let streamFn: () => AsyncIterable<string>
+    //Il signal e' un parametro di ciascun ramo, non una cattura: questa stessa
+    //funzione finisce in `lastCall.execute` e viene rieseguita da «Rigenera».
+    let streamFn: (signal: AbortSignal) => AsyncIterable<string>
     switch (actionId) {
       case 'summarize':
-        streamFn = () => api.summarize(currentInput, params.length ?? 'medio')
+        streamFn = (signal) => api.summarize(currentInput, params.length ?? 'medio', signal)
         break
       case 'translate':
-        streamFn = () => api.translate(currentInput, params.target_language ?? LANGUAGES[0].value)
+        streamFn = (signal) =>
+          api.translate(currentInput, params.target_language ?? LANGUAGES[0].value, signal)
         break
       case 'rewrite':
-        streamFn = () => api.rewrite(currentInput, params.style ?? STYLES[0].value)
+        streamFn = (signal) => api.rewrite(currentInput, params.style ?? STYLES[0].value, signal)
         break
       case 'grammar':
-        streamFn = () => api.grammar(currentInput)
+        streamFn = (signal) => api.grammar(currentInput, signal)
         break
       case 'critique':
-        streamFn = () => api.critique(currentInput, params.hat!)
+        streamFn = (signal) => api.critique(currentInput, params.hat!, signal)
         break
       case 'generate':
         streamFn = mode === 'link'
-          ? () => api.generateFromLink(currentInput, params.length ?? 'medio')
-          : () => api.generate(currentInput, params.length ?? 'medio')
+          ? (signal) => api.generateFromLink(currentInput, params.length ?? 'medio', signal)
+          : (signal) => api.generate(currentInput, params.length ?? 'medio', signal)
         break
       case 'generate-link':
-        streamFn = () => api.generateFromLink(currentInput, params.length ?? 'medio')
+        streamFn = (signal) => api.generateFromLink(currentInput, params.length ?? 'medio', signal)
         break
       default:
         return
@@ -465,8 +468,11 @@ export function AiActionDialog() {
   }
 
   const handleStop = () => {
+    //`abort()` spegne gia' l'indicatore di attesa: la seconda chiamata a
+    //`finishStreaming()` che stava qui era ridondante, e mascherava il fatto
+    //che l'altro comando di annullamento — quello della TopBar — non lo
+    //spegnesse affatto.
     abort()
-    useEditorStore.getState().finishStreaming()
   }
 
   const renderInputSlot = () => {
@@ -600,10 +606,21 @@ export function AiActionDialog() {
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
-    if (!next) {
-      useEditorStore.getState().setAiModal(null)
-    }
-    }}
+        if (!next) {
+          //Chiudere la modale mentre genera lasciava lo stream orfano: il
+          //provider continuava a produrre un testo che nessuno avrebbe piu'
+          //visto, perche' `TopBar.openModal` azzera `streamedOutput` alla
+          //riapertura. Non c'era quindi nulla da preservare proseguendo, e
+          //UC71 passo 3 chiede di liberare le risorse impegnate.
+          //Solo Escape e clic sull'overlay passano di qui: Accetta e Rifiuta
+          //chiudono impostando `aiModal`, che su un Dialog controllato non
+          //richiama questo callback.
+          if (useEditorStore.getState().isGenerating) {
+            abort()
+          }
+          useEditorStore.getState().setAiModal(null)
+        }
+      }}
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />

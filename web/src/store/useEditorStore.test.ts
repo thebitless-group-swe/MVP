@@ -377,3 +377,34 @@ describe('useEditorStore — abortStream', () => {
     }).not.toThrow()
   })
 })
+
+describe('useEditorStore — abortStream (UC71 / R-109-F-De)', () => {
+  it('annulla il controller e spegne subito l indicatore di attesa', () => {
+    const controller = new AbortController()
+
+    act(() => {
+      useEditorStore.setState({ _abortController: controller, isGenerating: true })
+    })
+
+    act(() => {
+      useEditorStore.getState().abortStream()
+    })
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState()._abortController).toBeNull()
+  })
+
+  it('e innocuo quando non c e nulla da annullare', () => {
+    act(() => {
+      useEditorStore.setState({ _abortController: null, isGenerating: false })
+    })
+
+    expect(() => {
+      act(() => {
+        useEditorStore.getState().abortStream()
+      })
+    }).not.toThrow()
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+  })
+})
