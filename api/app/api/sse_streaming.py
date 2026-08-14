@@ -1,10 +1,18 @@
 """Adattatore di trasporto: da stream di chunk LLM a risposta SSE HTTP.
 
-Sta sotto `infrastructure/adapters/` perche' e' il modulo che conosce HTTP —
-`StreamingResponse`, `HTTPException`, `Request.is_disconnected()` — e il formato
-degli eventi SSE. Finche' viveva in `llm/streaming.py`, quel package importava
-FastAPI accanto ai prompt, cioe' teneva il trasporto e il dominio sotto lo
-stesso nome.
+Sta sotto `api/` perche' e' un adattatore primario: non realizza alcuna porta,
+non parla con alcun servizio esterno e il dominio non lo chiama mai — lo
+chiamano le sette rotte di `api/routes/`. Traduce l'esito prodotto dal dominio
+nel protocollo della risposta HTTP verso il client, che e' lavoro del lato da
+cui l'applicazione viene invocata. Finche' e' vissuto sotto
+`infrastructure/adapters/` figurava come adattatore secondario accanto a
+`LiteLLMClient` e `TavilyExtractor`, che invece una porta la realizzano.
+
+Che conosca HTTP — `StreamingResponse`, `HTTPException`,
+`Request.is_disconnected()` — e il formato degli eventi SSE non lo colloca:
+anche le rotte lo conoscono, ed e' il lato primario a doverlo conoscere.
+Finche' viveva in `llm/streaming.py`, quel package importava FastAPI accanto ai
+prompt, cioe' teneva il trasporto e il dominio sotto lo stesso nome.
 """
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator
@@ -12,7 +20,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from ...core.ports.llm_client import LLMProviderError
+from ..core.ports.llm_client import LLMProviderError
 
 #Messaggio vincolato da UC 62: non modificare, tradurre o abbreviare.
 SERVICE_UNAVAILABLE_DETAIL = "Servizio temporaneamente non disponibile"

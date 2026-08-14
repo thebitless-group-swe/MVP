@@ -73,6 +73,7 @@ api/app/
 │   │   ├── summarize.py  generate.py  generate_link.py  translate.py
 │   │   └── rewrite.py    grammar.py   critique.py
 │   ├── schemas.py           DTO Pydantic: il confine HTTP
+│   ├── sse_streaming.py     formattazione della risposta SSE verso il client
 │   └── errors.py            traduzione degli errori di validazione per l'utente
 │
 ├── core/                    IL DOMINIO — non importa nulla verso l'esterno
@@ -81,7 +82,7 @@ api/app/
 │   └── services/            i sette use case, uno per file
 │
 ├── infrastructure/          ADATTATORI SECONDARI — chi l'applicazione chiama
-│   └── adapters/            LiteLLMClient, TavilyExtractor, sse_streaming
+│   └── adapters/            LiteLLMClient, TavilyExtractor
 │
 └── llm/prompts.py           i template dei prompt (collocazione transitoria)
 ```
@@ -91,10 +92,11 @@ che parte dell'esagono sta». Al centro c'è `core/`, che contiene le regole del
 prodotto e **non importa nulla dagli altri package**: gli use case in
 `core/services/` sono funzioni che ricevono una porta come ultimo parametro e non
 sanno chi la implementi. Attorno stanno i due tipi di adattatore. In `api/` vive
-tutto ciò che traduce una richiesta esterna in una chiamata al dominio: le route,
-i DTO che validano il corpo HTTP, i messaggi d'errore rivolti all'utente. In
+tutto ciò che sta sul confine HTTP verso il client: le route, che traducono una
+richiesta esterna in una chiamata al dominio, i DTO che validano il corpo HTTP,
+i messaggi d'errore rivolti all'utente, la formattazione SSE della risposta. In
 `infrastructure/` vive tutto ciò che il dominio chiama per parlare col mondo:
-il client LLM, l'estrattore di contenuti, la formattazione SSE. Le due direzioni
+il client LLM e l'estrattore di contenuti. Le due direzioni
 non si toccano mai direttamente — una route non istanzia un adattatore, chiede
 una porta e la passa a uno use case.
 

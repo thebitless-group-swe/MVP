@@ -1,4 +1,4 @@
-"""Test B-01: helper unico per lo streaming SSE (infrastructure/adapters/sse_streaming.py)."""
+"""Test B-01: helper unico per lo streaming SSE (api/sse_streaming.py)."""
 from collections.abc import AsyncIterator, Sequence
 
 import httpx
@@ -6,15 +6,15 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.core.domain.values import Message
-from app.core.ports.llm_client import LLMClient, LLMProviderError
-from app.dependencies import get_llm_client
-from app.infrastructure.adapters.litellm_client import LiteLLMClient
-from app.infrastructure.adapters.sse_streaming import (
+from app.api.sse_streaming import (
     SERVICE_UNAVAILABLE_DETAIL,
     SSE_ERROR_EVENT,
     sse_response,
 )
+from app.core.domain.values import Message
+from app.core.ports.llm_client import LLMClient, LLMProviderError
+from app.dependencies import get_llm_client
+from app.infrastructure.adapters.litellm_client import LiteLLMClient
 from app.main import app
 from app.settings import Settings
 
