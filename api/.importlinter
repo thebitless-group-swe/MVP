@@ -22,13 +22,17 @@ layers =
     app.infrastructure
     app.core
 
+# I moduli elencati sono i due adattatori secondari, cioe' quelli che
+# realizzano una porta di app.core.ports. sse_streaming non e' piu' fra questi:
+# e' stato spostato in app.api perche' non realizza alcuna porta e non parla con
+# alcun servizio esterno. Restarci lo avrebbe fatto figurare come un terzo
+# adattatore secondario, che non e'.
 [importlinter:contract:adapter-indipendente]
 name = Gli adattatori non si importano tra loro
 type = independence
 modules =
     app.infrastructure.adapters.tavily_extractor
     app.infrastructure.adapters.litellm_client
-    app.infrastructure.adapters.sse_streaming
 
 [importlinter:contract:core-non-importa-settings]
 name = Il core non importa direttamente app.settings

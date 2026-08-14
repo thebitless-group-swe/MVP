@@ -13,8 +13,8 @@ from ...core.services.generate_from_link import (
     generate_from_link as generate_from_link_service,
 )
 from ...dependencies import get_content_extractor, get_llm_client
-from ...infrastructure.adapters.sse_streaming import sse_response
 from ..schemas import LinkRequest
+from ..sse_streaming import sse_response
 
 router = APIRouter(prefix="/api", tags=["generate-link"])
 logger = logging.getLogger(__name__)
