@@ -193,7 +193,7 @@ export function Sidebar() {
     >
       <div className="flex items-center justify-between px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          My Workspace
+          Second Brain
         </p>
         <button
           type="button"
