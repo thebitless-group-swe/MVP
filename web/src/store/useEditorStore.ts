@@ -49,6 +49,7 @@ interface EditorState {
   setAiModal: (modal: AiModal) => void
   insertOutputIntoNote: (insertMode?: 'replace' | 'append') => void
   discardOutput: () => void
+  resetPreview: () => void
   editorView: EditorView | null
   setEditorView: (view: EditorView | null) => void
   _abortController: AbortController | null
@@ -143,6 +144,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       errorMessage: null,
       aiModal: null,
     }),
+
+  //Sorella di `discardOutput`, e la differenza e' l'ultima riga: quella chiude
+  //la modale perche' l'utente ha finito, questa la lascia aperta perche'
+  //l'utente sta riformulando la richiesta — cambia sorgente, lingua, stile,
+  //cappello o lunghezza.
+  //
+  //Perche' e' un'azione dello store e non `set({ streamedOutput: '' })`
+  //scritto nei sei punti che ne hanno bisogno: quei sei punti dimenticherebbero
+  //l'annullamento. `streamedOutput` non e' l'unica cosa da azzerare — c'e' una
+  //richiesta HTTP aperta che continua a produrre, e `useAiStream` continua a
+  //chiamare `appendChunk`. Pulire senza chiudere fa ricomparire nell'anteprima
+  //appena svuotata i chunk della richiesta che l'utente ha appena abbandonato.
+  //
+  //L'annullamento passa per `abortStream` invece di ripeterne il corpo: come
+  //si chiude una richiesta in corso e' deciso li' (UC71), e deve restare una
+  //decisione sola.
+  resetPreview: () => {
+    get().abortStream()
+    set({ streamedOutput: '', errorMessage: null })
+  },
   editorView: null,
   setEditorView: (view) => set({ editorView: view }),
 

@@ -408,3 +408,74 @@ describe('useEditorStore — abortStream (UC71 / R-109-F-De)', () => {
     expect(useEditorStore.getState().isGenerating).toBe(false)
   })
 })
+
+describe('useEditorStore — resetPreview', () => {
+  it('azzera anteprima ed errore della richiesta precedente', () => {
+    act(() => {
+      useEditorStore.setState({
+        streamedOutput: 'la traduzione in inglese di prima',
+        errorMessage: 'errore della richiesta precedente',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+    expect(useEditorStore.getState().errorMessage).toBeNull()
+  })
+
+  // Il motivo per cui `resetPreview` non e' `set({ streamedOutput: '' })` scritto
+  // sul posto. Azzerare mentre lo stream e' aperto non basta: il ciclo di
+  // `useAiStream` continua a chiamare `appendChunk`, e i chunk della richiesta
+  // che l'utente ha appena abbandonato ricompaiono nell'anteprima appena
+  // pulita. Prima si chiude la richiesta, poi si pulisce.
+  it('annulla la richiesta in corso prima di azzerare (UC71)', () => {
+    const controller = new AbortController()
+
+    act(() => {
+      useEditorStore.setState({
+        _abortController: controller,
+        isGenerating: true,
+        streamedOutput: 'meta della traduzione in inglese',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState()._abortController).toBeNull()
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  // Cambiare sorgente o parametro riguarda la richiesta, non la nota: il testo
+  // dell'utente non e' output dell'IA e non va toccato.
+  it('non tocca il testo della nota ne la selezione', () => {
+    act(() => {
+      useEditorStore.setState({
+        currentText: 'nota intatta',
+        selectedText: 'parola',
+        streamedOutput: 'output da scartare',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(useEditorStore.getState().currentText).toBe('nota intatta')
+    expect(useEditorStore.getState().selectedText).toBe('parola')
+  })
+
+  it('e innocuo quando non c e nulla da azzerare', () => {
+    expect(() => {
+      act(() => {
+        useEditorStore.getState().resetPreview()
+      })
+    }).not.toThrow()
+  })
+})

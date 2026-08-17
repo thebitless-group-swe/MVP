@@ -7,7 +7,26 @@ from ...core.domain.values import Message
 from ...core.ports.llm_client import LLMClient, LLMProviderError
 from ...settings import Settings
 
-HTTP_TIMEOUT_SECONDS = 60.0
+#I due guasti che l'attesa misura sono diversi, e prima erano lo stesso numero.
+#
+#`httpx.AsyncClient(timeout=60.0)` assegna 60 s a *ciascuna* delle quattro fasi,
+#compresa la lettura — che su una risposta in streaming non misura la durata
+#della generazione ma la **pausa fra due chunk**. Il primo chunk arriva quando il
+#modello ha finito di pensare: su un modello grande o su un gateway carico puo'
+#volerci piu' di un minuto, ed e' stato misurato (101 s su gemma3:27b). Con un
+#tetto di 60 s quella richiesta moriva di `ReadTimeout` e l'utente riceveva un
+#503 «servizio non disponibile» per una generazione che stava solo andando
+#piano: il guasto peggiore possibile, perche' indistinguibile da un guasto vero.
+#
+#La connessione ha il problema opposto. O si apre subito o dall'altra parte non
+#c'e' nessuno: concederle i minuti che serve alla lettura significherebbe tenere
+#l'utente fermo davanti a un servizio spento. Da qui i due valori, e il test
+#`test_la_lettura_attende_piu_a_lungo_della_connessione` che ne fissa l'ordine.
+CONNECT_TIMEOUT_SECONDS = 10.0
+READ_TIMEOUT_SECONDS = 180.0
+WRITE_TIMEOUT_SECONDS = 30.0
+POOL_TIMEOUT_SECONDS = 10.0
+
 SSE_DATA_PREFIX = "data:"
 SSE_DONE_MARKER = "[DONE]"
 
@@ -21,9 +40,9 @@ class LiteLLMClient(LLMClient):
     (`prompts.py`) e l'unico modulo del backend che conosce httpx e il formato
     SSE del provider.
 
-    Le tre costanti si spostano con la classe: descrivono il protocollo del
-    provider, non una regola di dominio. `HTTP_TIMEOUT_SECONDS` resta pubblica
-    perche' i test la usano per verificare la configurazione del trasporto.
+    Le costanti si spostano con la classe: descrivono il protocollo del
+    provider, non una regola di dominio. Quelle di timeout restano pubbliche
+    perche' i test le usano per verificare la configurazione del trasporto.
     """
 
     def __init__(self, settings: Settings) -> None:
@@ -35,7 +54,12 @@ class LiteLLMClient(LLMClient):
         self._settings = settings
         self._client = httpx.AsyncClient(
             base_url=settings.litellm_base_url,
-            timeout=HTTP_TIMEOUT_SECONDS,
+            timeout=httpx.Timeout(
+                connect=CONNECT_TIMEOUT_SECONDS,
+                read=READ_TIMEOUT_SECONDS,
+                write=WRITE_TIMEOUT_SECONDS,
+                pool=POOL_TIMEOUT_SECONDS,
+            ),
             headers={"Authorization": f"Bearer {settings.litellm_api_key}"},
         )
 
@@ -43,8 +67,10 @@ class LiteLLMClient(LLMClient):
         """Chiude il client HTTP sottostante (da invocare allo shutdown dell'app)."""
         await self._client.aclose()
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
-        payload = {
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
+        payload: dict = {
             "model": self._settings.litellm_model,
             #L'unico punto del backend in cui un messaggio prende la forma di
             #filo del provider. Il dominio parla di `Message`; le chiavi
@@ -54,6 +80,13 @@ class LiteLLMClient(LLMClient):
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": True,
         }
+        #Aggiunta condizionale, non chiave a `None`: i due casi non sono lo
+        #stesso per il provider. `"max_tokens": null` e' accettato dallo schema
+        #OpenAI ma non da tutti i gateway compatibili, e su alcuni un `null` in
+        #piu' e' un 400. Assente significa «decidi tu», che e' cio' che le
+        #quattro funzioni senza tetto vogliono dire.
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         try:
             async with self._client.stream(
                 "POST", "/chat/completions", json=payload

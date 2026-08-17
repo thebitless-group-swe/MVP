@@ -34,7 +34,7 @@ puo' continuare a catturare il solo `FetchError`.
 from collections.abc import AsyncIterator
 
 from ..domain.prompts.templates import build_generate_from_link_messages
-from ..domain.values import MAX_TEXT_LENGTH, Length
+from ..domain.values import LENGTH_MAX_TOKENS, MAX_TEXT_LENGTH, Length
 from ..ports.content_extractor import ContentExtractor, ContentExtractorError
 from ..ports.llm_client import LLMClient
 
@@ -68,6 +68,12 @@ async def generate_from_link(
 ) -> AsyncIterator[str]:
     """Genera un testo dal contenuto della pagina a `url`, come stream di chunk.
 
+    Il tetto di token e' quello della lunghezza scelta, come negli altri due
+    generatori: il contenuto estratto puo' essere lungo fino a `MAX_TEXT_LENGTH`
+    caratteri, e senza tetto un modello tentato di riassumerlo per intero
+    ignorerebbe la lunghezza richiesta. Vedi summarize.py per il perche' del
+    doppio percorso.
+
     Raises:
         InvalidLinkError: se il link viene scartato dalla validazione, prima di
             qualunque richiesta di rete.
@@ -78,4 +84,7 @@ async def generate_from_link(
     validate_link(url)
     text = await fetch_and_extract(url, extractor)
 
-    return llm.stream(build_generate_from_link_messages(text, length))
+    return llm.stream(
+        build_generate_from_link_messages(text, length),
+        max_tokens=LENGTH_MAX_TOKENS[length],
+    )

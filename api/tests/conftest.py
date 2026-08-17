@@ -57,12 +57,22 @@ class DummyLLMClient(LLMClient):
 
     DEFAULT_CHUNKS = ["chunk1 ", "chunk2 ", "fine"]
 
+    #Sentinella distinta da None: `received_max_tokens is None` deve significare
+    #«lo use case non ha chiesto alcun tetto», non «lo stream non e' mai partito».
+    #Senza questa distinzione un test che verifica l'assenza di budget passerebbe
+    #anche su uno stream che nessuno ha consumato.
+    NON_INVOCATO = object()
+
     def __init__(self, chunks: list[str] | None = None) -> None:
         self._chunks = chunks if chunks is not None else self.DEFAULT_CHUNKS
         self.received_messages: Sequence[Message] | None = None
+        self.received_max_tokens: int | None | object = self.NON_INVOCATO
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         self.received_messages = messages
+        self.received_max_tokens = max_tokens
         for chunk in self._chunks:
             yield chunk
 

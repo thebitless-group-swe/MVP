@@ -74,9 +74,11 @@ class LLMClientSpia(DummyLLMClient):
         super().__init__()
         self.stream_calls = 0
 
-    def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         self.stream_calls += 1
-        return super().stream(messages)
+        return super().stream(messages, max_tokens)
 
 
 async def _collect(stream: AsyncIterator[str]) -> list[str]:

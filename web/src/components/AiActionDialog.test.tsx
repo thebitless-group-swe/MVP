@@ -473,3 +473,179 @@ describe('AiActionDialog — chiusura durante la generazione (UC71)', () => {
     expect(useEditorStore.getState().aiModal).toBeNull()
   })
 })
+
+// L'anteprima appartiene alla richiesta che l'ha prodotta, non alla modale che
+// la ospita. Cambiare sorgente o parametro significa formulare una richiesta
+// diversa: cio' che si vede a video non e' piu' la risposta a cio' che la
+// modale sta chiedendo, e mostrarlo fa credere il contrario.
+describe('AiActionDialog — l anteprima non sopravvive al cambio di richiesta', () => {
+  it('passando da «Da prompt» a «Da link» l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'generate',
+        streamedOutput: 'testo generato dal prompt di prima',
+        isGenerating: false,
+      })
+    })
+    render(<AiActionDialog />)
+
+    expect(screen.getByLabelText('Anteprima output')).toHaveTextContent(
+      'testo generato dal prompt di prima',
+    )
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+    expect(screen.getByLabelText('Anteprima output').textContent).toBe('')
+  })
+
+  it('tornando da «Da link» a «Da prompt» l anteprima si svuota', async () => {
+    act(() => { useEditorStore.getState().setAiModal('generate') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
+    act(() => {
+      useEditorStore.setState({ streamedOutput: 'testo generato dal link' })
+    })
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da prompt' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('cambiando lingua di destinazione l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        streamedOutput: 'The winter sea is a concept the mind does not consider.',
+        isGenerating: false,
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Spagnolo' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+    expect(screen.getByLabelText('Anteprima output').textContent).toBe('')
+  })
+
+  it('cambiando stile di riscrittura l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'rewrite',
+        streamedOutput: 'riscrittura formale di prima',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Accademico' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('cambiando cappello l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'critique',
+        streamedOutput: 'analisi del cappello bianco',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: /critico/i }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('cambiando lunghezza l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'summarize',
+        streamedOutput: 'riassunto medio di prima',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Breve' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  // Anche l'errore appartiene alla richiesta di prima: lasciarlo sotto una
+  // richiesta diversa lo fa leggere come se riguardasse questa.
+  it('l errore della richiesta precedente sparisce con essa', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        errorMessage: 'Servizio temporaneamente non disponibile',
+      })
+    })
+    render(<AiActionDialog />)
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Tedesco' }))
+
+    expect(useEditorStore.getState().errorMessage).toBeNull()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  // Il caso che azzerare non basta a coprire: con lo stream ancora aperto
+  // `appendChunk` continua a scrivere, e i chunk della lingua abbandonata
+  // ricompaiono nell'anteprima appena pulita.
+  it('cambiare parametro durante la generazione annulla la richiesta in corso', async () => {
+    const controller = new AbortController()
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        isGenerating: true,
+        _abortController: controller,
+        streamedOutput: 'The winter sea',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Spagnolo' }))
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+})
+
+// Il rovescio della medaglia dei test qui sopra: azzerare quando la richiesta
+// cambia non deve diventare azzerare a ogni clic. Un `PillSelector` emette
+// `onChange` anche quando si ri-clicca l'opzione gia' attiva, e senza guardia
+// l'utente perderebbe l'output per aver cliccato «Medio» due volte.
+describe('AiActionDialog — ri-cliccare la scelta gia attiva non azzera nulla', () => {
+  it('ri-cliccare la lingua gia selezionata lascia l anteprima al suo posto', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        streamedOutput: 'The winter sea is a concept the mind does not consider.',
+      })
+    })
+    render(<AiActionDialog />)
+
+    // «Inglese» e' il default della modale di traduzione.
+    await userEvent.click(screen.getByRole('radio', { name: 'Inglese' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe(
+      'The winter sea is a concept the mind does not consider.',
+    )
+  })
+
+  it('ri-cliccare la tab gia attiva lascia l anteprima al suo posto', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'generate',
+        streamedOutput: 'testo generato dal prompt',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da prompt' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('testo generato dal prompt')
+  })
+})

@@ -193,7 +193,9 @@ async def test_real_fixture_preserves_the_newline_chunk(sse_chunks: str) -> None
 class _MidStreamErrorClient(LLMClient):
     """Emette un chunk valido, poi fallisce a meta' stream."""
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         yield "parziale"
         raise LLMProviderError(f"Errore provider con chiave {SENTINEL_SECRET}")
 

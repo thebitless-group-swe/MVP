@@ -30,7 +30,9 @@ class SpyLLMClient(LLMClient):
     def __init__(self) -> None:
         self.calls = 0
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         self.calls += 1
         yield "chunk"
 

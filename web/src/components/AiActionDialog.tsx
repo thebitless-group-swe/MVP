@@ -372,10 +372,38 @@ export function AiActionDialog() {
   const inputTooLong =
     effectiveMaxLength !== null && currentInput.length > effectiveMaxLength
 
+  // Cambiare sorgente o parametro non e' ritoccare la richiesta di prima: e'
+  // formularne una diversa. Cio' che l'anteprima mostra e' la risposta a quella
+  // precedente — il testo generato dal prompt quando si passa al link, la
+  // traduzione inglese quando si sceglie lo spagnolo — e lasciarlo a video lo fa
+  // leggere come risposta a quella nuova. `resetPreview` lo toglie e, se una
+  // generazione e' in corso, la chiude prima (UC71): senza quel passaggio i
+  // chunk della richiesta abbandonata continuerebbero ad arrivare
+  // nell'anteprima appena svuotata.
+  const resetPreview = () => useEditorStore.getState().resetPreview()
+
+  // La guardia non e' un'ottimizzazione. Sia le tab sia `PillSelector` emettono
+  // il proprio `onChange` anche quando si ri-clicca la voce gia' attiva, e
+  // senza di essa l'utente perderebbe l'output per aver cliccato due volte
+  // «Medio». Azzerare va fatto quando la richiesta cambia davvero, non a ogni
+  // clic su un selettore.
   const handleModeChange = (next: 'prompt' | 'link') => {
+    if (next === mode) return
+    resetPreview()
     dispatch({ type: 'SET_MODE', payload: next })
     dispatch({ type: 'SET_INPUT', payload: '' })
     dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
+  }
+
+  // Unico punto di modifica dei parametri: passa da qui ciascuno dei cinque
+  // selettori, cosi' che aggiungerne un sesto non possa dimenticare il reset.
+  // Il confronto e' per valore e non per identita' perche' `next` e' sempre un
+  // oggetto nuovo (`{ ...params, chiave: v }`): e' lo stesso `JSON.stringify`
+  // con cui `sameAsLast` qui sopra confronta i parametri di due richieste.
+  const handleParamsChange = (next: AiParams) => {
+    if (JSON.stringify(next) === JSON.stringify(params)) return
+    resetPreview()
+    dispatch({ type: 'SET_PARAMS', payload: next })
   }
 
   const handleGenerate = () => {
@@ -569,7 +597,7 @@ export function AiActionDialog() {
             label="Lunghezza output"
             options={LENGTHS}
             value={params.length ?? 'medio'}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, length: v } })}
+            onChange={(v) => handleParamsChange({ ...params, length: v })}
           />
         )
       case 'translate':
@@ -578,7 +606,7 @@ export function AiActionDialog() {
             label="Lingua di destinazione"
             options={LANGUAGES}
             value={params.target_language ?? LANGUAGES[0].value}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, target_language: v } })}
+            onChange={(v) => handleParamsChange({ ...params, target_language: v })}
           />
         )
       case 'rewrite':
@@ -587,14 +615,14 @@ export function AiActionDialog() {
             label="Stile"
             options={STYLES}
             value={params.style ?? STYLES[0].value}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, style: v } })}
+            onChange={(v) => handleParamsChange({ ...params, style: v })}
           />
         )
       case 'critique':
         return (
           <HatSelector
             value={params.hat ?? null}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, hat: v } })}
+            onChange={(v) => handleParamsChange({ ...params, hat: v })}
           />
         )
       case 'grammar':

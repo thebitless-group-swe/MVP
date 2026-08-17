@@ -94,7 +94,9 @@ def test_endpoint_uses_injected_client() -> None:
 class SlowDummyLLMClient(LLMClient):
     CHUNKS = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         for chunk in self.CHUNKS:
             await asyncio.sleep(0.05)
             yield chunk

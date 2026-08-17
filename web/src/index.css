@@ -1,6 +1,21 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@fontsource-variable/geist";
+/* Le face corsive, che l'import qui sopra NON porta con se': `index.css` del
+ * pacchetto dichiara solo @font-face con `font-style: normal`, e i file
+ * `*-wght-italic.woff2` restavano inutilizzati sul disco.
+ *
+ * Senza questa riga `<em>` veniva reso identico al testo normale, perche' i due
+ * modi di ottenere un corsivo erano entrambi chiusi: non c'era una face
+ * disegnata da usare, e `font-synthesis: none` piu' in basso vieta al browser
+ * di inclinare artificialmente quella dritta. Il grassetto invece funzionava, e
+ * la differenza indicava gia' la causa: Geist Variable ha l'asse di peso
+ * 100-900, quindi il grassetto e' vero; il corsivo e' un'altra famiglia di file.
+ *
+ * Si caricano le face vere invece di riabilitare la sintesi: un corsivo
+ * sintetico e' la stessa lettera inclinata di qualche grado, non la lettera che
+ * il disegnatore ha disegnato per quel ruolo. */
+@import "@fontsource-variable/geist/wght-italic.css";
 
 @plugin "@tailwindcss/typography";
 

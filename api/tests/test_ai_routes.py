@@ -43,7 +43,9 @@ ROUTE_IDS = [case[0] for case in ROUTE_CASES]
 class EarlyErrorLLMClient(LLMClient):
     """Fallisce prima del primo chunk."""
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         raise LLMProviderError("Provider non raggiungibile")
         yield  # pragma: no cover - rende stream un async generator
 

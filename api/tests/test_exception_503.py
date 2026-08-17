@@ -35,7 +35,9 @@ class DummyErrorLLMClient(LLMClient):
     che, anche se l'eccezione interna la contiene, non trapela al client.
     """
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         raise LLMProviderError(
             f"Errore interno provider con chiave {SENTINEL_API_KEY}"
         )

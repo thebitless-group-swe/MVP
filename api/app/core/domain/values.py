@@ -17,6 +17,29 @@ from typing import Literal
 # Alias riusabile per la lunghezza richiesta delle funzioni AI.
 Length = Literal["breve", "medio", "dettagliato"]
 
+# Tetto di token concesso al provider per ciascuna lunghezza (UC67.3 passo 3,
+# UC62.1). E' la seconda meta' della scelta dell'utente: la prima — l'istruzione
+# in parole, `LENGTH_INSTRUCTIONS` — dice al modello quanto scrivere, questa
+# glielo impedisce di superare.
+#
+# **Perche' qui e non accanto a `LENGTH_INSTRUCTIONS`.** Quella e' testo che
+# finisce dentro il prompt, e `prompts/rules.py` contiene solo testo che finisce
+# dentro il prompt. Questo e' un parametro della chiamata HTTP al fornitore, che
+# nel prompt non compare: metterlo li' avrebbe reso falsa la frase con cui quel
+# modulo si presenta. Sta invece accanto a `Length`, cioe' accanto al tipo di
+# cui e' una proprieta'.
+#
+# **Sui valori.** Sono i token dell'istruzione corrispondente piu' un margine
+# largo, non una stima al risparmio: il tetto serve a fermare una generazione
+# fuori controllo, non a tagliare quella corretta. Un modello che rispetta
+# l'istruzione non li raggiunge mai; uno che la ignora si ferma qui invece di
+# consumare l'intera finestra di contesto.
+LENGTH_MAX_TOKENS: dict[Length, int] = {
+    "breve": 256,
+    "medio": 640,
+    "dettagliato": 1536,
+}
+
 # Lingue di destinazione della traduzione (UC 53.1).
 Language = Literal["inglese", "francese", "tedesco", "spagnolo"]
 

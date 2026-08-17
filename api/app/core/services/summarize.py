@@ -29,15 +29,24 @@ uscire da `core/` per costruire il proprio messaggio. Ora sono in
 from collections.abc import AsyncIterator
 
 from ..domain.prompts.templates import build_summarize_messages
-from ..domain.values import Length
+from ..domain.values import LENGTH_MAX_TOKENS, Length
 from ..ports.llm_client import LLMClient
 
 
 def summarize(text: str, length: Length, llm: LLMClient) -> AsyncIterator[str]:
     """Riassume `text` nella lunghezza richiesta, come stream di chunk.
 
+    La lunghezza scelta raggiunge il provider per due strade, ed e' voluto che
+    siano due: come istruzione dentro il prompt, che dice al modello quanto
+    scrivere, e come tetto di token sulla chiamata (UC62.1, UC67.3 passo 3), che
+    gli impedisce di superarlo se l'istruzione la ignora. La prima e' una
+    richiesta, la seconda un vincolo.
+
     Raises:
         LLMProviderError: propagato dalla porta alla prima iterazione dello
             stream, non alla chiamata di questa funzione.
     """
-    return llm.stream(build_summarize_messages(text, length))
+    return llm.stream(
+        build_summarize_messages(text, length),
+        max_tokens=LENGTH_MAX_TOKENS[length],
+    )

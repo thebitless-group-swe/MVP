@@ -32,6 +32,23 @@ describe('EditorToolbar', () => {
     expect(screen.getByRole('button', { name: 'Barrato' })).toBeInTheDocument()
   })
 
+  // La toolbar formatta, e basta: il salvataggio e' della sidebar, dove
+  // «Salva file» realizza R-88-F-Ob (UC78.1) con la guardia sulla nota corrente
+  // e il percorso d'errore che R-90-F-Ob (UC79) richiede.
+  //
+  // Qui c'era un secondo pulsante «Salva» privo di `onClick`: non salvava
+  // nulla, e non essendo nemmeno disabilitato aveva l'aspetto di un comando
+  // attivo. Un comando che non fa nulla e' peggio di un comando assente, perche'
+  // l'utente non puo' sapere se la nota e' stata salvata. Questo test impedisce
+  // che rientri per distrazione: un giorno qualcuno rimettera' un «Salva» in
+  // questa barra, e allora dovra' anche collegarlo — e dare al suo errore un
+  // posto visibile con la sidebar chiusa, che e' il lavoro vero.
+  it('non offre un comando di salvataggio: quello vive nella sidebar', () => {
+    render(<EditorToolbar />)
+
+    expect(screen.queryByRole('button', { name: /salva/i })).not.toBeInTheDocument()
+  })
+
   it('il pulsante Sottolineato invoca toggleUnderlineCommand', async () => {
     render(<EditorToolbar />)
 

@@ -14,7 +14,8 @@ import pytest
 from app.core.domain.values import Message
 from app.core.ports.llm_client import LLMProviderError
 from app.infrastructure.adapters.litellm_client import (
-    HTTP_TIMEOUT_SECONDS,
+    CONNECT_TIMEOUT_SECONDS,
+    READ_TIMEOUT_SECONDS,
     LiteLLMClient,
 )
 from app.settings import Settings
@@ -51,9 +52,21 @@ async def test_init_configura_client_httpx() -> None:
     assert str(client._client.base_url) == "http://litellm:4000/v1/"
     # httpx normalizza la chiave header in minuscolo.
     assert client._client.headers["authorization"] == "Bearer chiave-segreta"
-    assert client._client.timeout.read == HTTP_TIMEOUT_SECONDS
+    assert client._client.timeout.read == READ_TIMEOUT_SECONDS
+    assert client._client.timeout.connect == CONNECT_TIMEOUT_SECONDS
 
     await client.aclose()
+
+
+# I due timeout misurano guasti diversi e non possono avere lo stesso valore.
+# La connessione o si apre subito o il gateway non c'e': attenderla quanto si
+# attende un modello che genera vorrebbe dire tenere l'utente fermo per minuti
+# davanti a un servizio spento. La lettura, all'opposto, misura la pausa fra due
+# chunk, e con un modello grande la prima puo' durare piu' di un minuto: e' il
+# guasto che il valore unico di 60 s trasformava in un 503 su una richiesta che
+# stava solo andando piano.
+def test_la_lettura_attende_piu_a_lungo_della_connessione() -> None:
+    assert CONNECT_TIMEOUT_SECONDS < READ_TIMEOUT_SECONDS
 
 
 async def test_aclose_chiude_il_client() -> None:
@@ -98,6 +111,41 @@ async def test_stream_invia_payload_corretto() -> None:
         "messages": PAYLOAD_MESSAGES,
         "stream": True,
     }
+    await client.aclose()
+
+
+# UC67.3 passo 3: il tetto scelto dallo use case arriva al provider come
+# `max_tokens`. E' l'unico punto in cui una decisione di dominio prende il nome
+# che ha nel protocollo del fornitore, ed e' qui che si verifica.
+async def test_stream_invia_max_tokens_quando_lo_use_case_lo_chiede() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content)
+        return httpx.Response(200, content=b"data: [DONE]\n\n")
+
+    client = make_client(handler)
+    _ = [chunk async for chunk in client.stream(MESSAGES, max_tokens=640)]
+
+    assert captured["payload"]["max_tokens"] == 640
+    await client.aclose()
+
+
+# Il contrario, ed e' la meta' che conta: per le quattro funzioni che riscrivono
+# un testo esistente la chiave non deve comparire affatto. Inviarla a zero, o a
+# un default qualunque, troncherebbe l'output; ometterla lascia decidere al
+# provider, che e' il comportamento voluto.
+async def test_stream_omette_del_tutto_max_tokens_quando_non_richiesto() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content)
+        return httpx.Response(200, content=b"data: [DONE]\n\n")
+
+    client = make_client(handler)
+    _ = [chunk async for chunk in client.stream(MESSAGES)]
+
+    assert "max_tokens" not in captured["payload"]
     await client.aclose()
 
 
