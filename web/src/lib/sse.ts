@@ -1,43 +1,18 @@
 const DONE_MARKER = '[DONE]'
 const ERROR_EVENT_NAME = 'error'
 
-/**
- * Messaggio mostrato quando lo stream si chiude senza alcun terminatore.
- *
- * E' l'unico messaggio che nasce lato client: negli altri casi di errore il
- * testo arriva dal backend nel payload dell'evento `error`. Qui il server non
- * ha detto nulla — la connessione e' semplicemente caduta — quindi il testo va
- * prodotto qui. Indica causa e azione correttiva senza dettagli tecnici
- * (R-110-F-Ob).
- */
+// L'unico messaggio d'errore che nasce lato client, negli altri casi arriva dal backend.
 export const STREAM_INTERRUPTED_MESSAGE =
   'La generazione si è interrotta prima di completarsi. Riprova.'
 
-/**
- * Esito di un evento SSE consumato dal parser.
- *
- * I due casi sono distinguibili per asserzione e non per implicazione: prima
- * di questa correzione uno stream chiuso a meta' era indistinguibile da uno
- * completato, e l'utente riceveva un testo troncato spacciato per completo.
- */
 export type SseEvent =
   | { type: 'chunk'; data: string }
   | { type: 'error'; message: string }
 
 type SseField = { name: string; value: string }
 
-/**
- * Scompone una riga SSE nel nome del campo e nel suo valore.
- *
- * Il dispatch avviene sul NOME del campo, non con un match sul testo della
- * riga: e' questo che permette a un chunk il cui contenuto e' letteralmente
- * `event: error` di arrivare all'utente come testo invece di essere scambiato
- * per un errore. Su un'applicazione che genera Markdown arbitrario non e' un
- * caso di scuola.
- *
- * Ritorna null per le righe di commento (`: ...`), che la specifica SSE
- * prevede e che vanno ignorate.
- */
+// Si smista sul NOME del campo e non sul testo della riga, altrimenti un chunk
+// che contiene `event: error` verrebbe scambiato per un errore.
 function parseField(line: string): SseField | null {
   if (line.startsWith(':')) return null
 
@@ -53,24 +28,8 @@ function parseField(line: string): SseField | null {
 /**
  * Trasforma un ReadableStream SSE in un flusso di eventi.
  *
- * Il parser e' costruito sulla struttura dell'EVENTO e non sulla singola riga:
- * nella specifica SSE un evento e' un `event:` opzionale piu' una o piu' righe
- * `data:`, chiuse da una riga vuota. Le righe `data:` di uno stesso evento
- * vengono accumulate e riunite con `\n`.
- *
- * Prima di questa correzione ogni riga era un evento a se': un chunk contenente
- * un a capo produceva righe prive del prefisso `data:`, che venivano scartate.
- * Non si perdeva il solo carattere `\n`, si perdeva tutto il testo che lo
- * seguiva — sistematico su ogni risposta Markdown non banale.
- *
- * Tre terminatori distinti:
- *   - `data: [DONE]`  -> successo, il generatore termina senza eventi di errore
- *   - `event: error`  -> fallimento, con il messaggio fornito dal backend
- *   - chiusura senza nessuno dei due -> fallimento (stream troncato)
- *
- * Gestisce anche il buffering delle righe (un chunk di rete puo' spezzare una
- * riga a meta') e le terminazioni CRLF. Pure function: nessuna dipendenza da
- * React o dallo store.
+ * Lavora sull'EVENTO, non sulla riga. Se lo fate andare per riga, un chunk con
+ * un a capo dentro perde tutto il testo dopo il primo \n.
  */
 export async function* parseSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -83,16 +42,8 @@ export async function* parseSseStream(
   let dataLines: string[] = []
   let terminated = false
 
-  /**
-   * Chiude l'evento corrente sulla riga vuota.
-   *
-   * I tre casi da NON collassare:
-   *   - nessuna riga `data:`      -> l'evento non produce nulla
-   *   - una riga `data:` vuota    -> l'evento produce la stringa vuota
-   *   - riga non riconosciuta     -> ignorata, non tocca l'accumulatore
-   * Confondere i primi due riproporrebbe la perdita di contenuto in forma piu'
-   * sottile, perche' un chunk contenente `\n\n` genera proprio una riga vuota.
-   */
+  // Non collassate «nessuna riga data» con «una riga data vuota», un chunk con
+  // \n\n dentro genera proprio una riga vuota e confonderli fa sparire testo.
   const closeEvent = (): SseEvent | null => {
     const name = eventName
     const hasData = dataLines.length > 0
@@ -140,9 +91,7 @@ export async function* parseSseStream(
 
   if (terminated) return
 
-  // Lo stream si e' chiuso senza terminatore. Emettiamo comunque l'ultimo
-  // evento incompleto — il testo gia' arrivato resta visibile — e subito dopo
-  // l'errore, cosi' che il troncamento non passi per completamento.
+  // Si manda l'ultimo testo arrivato e poi l'errore, cosi' il troncamento si vede.
   if (buffer.length > 0) {
     const event = consumeLine(buffer)
     if (event !== null) yield event

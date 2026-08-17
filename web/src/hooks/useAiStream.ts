@@ -5,11 +5,8 @@ import { useEditorStore } from '@/store/useEditorStore'
 export type AiStreamStatus = 'idle' | 'streaming' | 'done' | 'error'
 
 export type AiStreamHandle = {
-  //Il signal e' un PARAMETRO di `fn`, non una cattura della chiusura che la
-  //costruisce. La differenza non e' stilistica: `LastCall.execute` viene
-  //memorizzata nello store e rieseguita da «Rigenera», e un signal catturato
-  //alla creazione sarebbe gia' annullato al secondo giro — «Rigenera» dopo un
-  //annullamento non ripartirebbe mai.
+  //Il signal e' un PARAMETRO di fn, non una cattura. LastCall.execute viene
+  //rieseguita da Rigenera, e un signal catturato sarebbe gia' annullato.
   start: <T>(fn: (signal: AbortSignal) => AsyncIterable<T>) => Promise<void>
   abort: () => void
   status: AiStreamStatus
@@ -59,12 +56,7 @@ export function useAiStream(): AiStreamHandle {
         setStatus('done')
         useEditorStore.getState().finishStreaming()
       } catch (error) {
-        //Riconoscimento per nome e non per classe: da quando il signal
-        //raggiunge la `fetch` questo e' il percorso normale dell'annullamento,
-        //e `instanceof DOMException` vale `false` sull'errore che un abort
-        //reale produce qui. Con il controllo per classe l'annullamento sarebbe
-        //caduto due righe piu' sotto e «This operation was aborted» sarebbe
-        //finito sotto gli occhi dell'utente, contro R-110-F-Ob.
+        //Percorso normale dell'annullamento, va riconosciuto per nome (lib/abort.ts).
         if (isAbortError(error)) {
           setStatus('idle')
           useEditorStore.getState().finishStreaming()

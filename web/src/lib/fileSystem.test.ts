@@ -106,6 +106,7 @@ describe('openNoteFromFile — File System Access API (Chrome, Edge)', () => {
   })
 })
 
+// Ramo obbligatorio, non un caso limite: R-1-V-Ob impone anche Firefox.
 describe('openNoteFromFile — fallback senza File System Access API (Firefox)', () => {
   it('usa il nome del file come titolo, come fa l altro ramo', async () => {
     //E' il difetto per cui esiste questa issue: il ramo di fallback scartava
@@ -261,17 +262,9 @@ describe('saveNoteToFile — fallback download (Firefox)', () => {
   })
 })
 
+// Attenzione, renameNote cambia solo il titolo in memoria, NON rinomina il
+// file su disco come vorrebbe UC82.1. Questi test fissano cio' che fa oggi.
 describe('renameNote', () => {
-  /**
-   * Terzo esportato del modulo, fuori dal percorso Firefox di questa issue: e'
-   * coperto qui perche' `fileSystem.ts` entra nella misura di copertura proprio
-   * grazie a #32, e lasciarci una funzione scoperta falserebbe i numeri di #42.
-   *
-   * I test fissano cio' che la funzione fa **oggi**, non cio' che UC82.1
-   * pretende: la post-condizione «il file fisico viene rinominato sul disco» qui
-   * non e' realizzata, e non e' realizzabile in un browser. La classificazione
-   * di R-94 e la revisione di UC82.1 sono in #44.
-   */
   it('aggiorna il titolo e rinfresca updatedAt, senza toccare il contenuto', async () => {
     const originale: Note = {
       id: 'x', title: 'Vecchio', content: 'corpo', createdAt: 0, updatedAt: 0,

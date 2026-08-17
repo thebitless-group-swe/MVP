@@ -12,17 +12,12 @@ import {
 } from '@/types/models'
 import { AI_ACTIONS } from '@/lib/aiActions'
 
-// Hoisted: i mock devono essere pronti prima che vi.mock li usi
 const { mockStart, mockAbort, capturedFn } = vi.hoisted(() => ({
   mockStart: vi.fn().mockImplementation(async (fn) => {
-    // Salva la funzione per poterla ispezionare dopo
     capturedFn.value = fn
   }),
-  //Doppio fedele di `abort()`: annulla il controller in corso, lo sgancia e
-  //spegne l'indicatore di attesa — cio' che il vero hook fa, osservato da
-  //fuori. Un doppio inerte faceva passare il test dell'Interrompi solo perche'
-  //il componente chiamava `finishStreaming()` una seconda volta: il doppio
-  //mentiva, e il codice di produzione pagava il conto con una riga ridondante.
+  //Doppio fedele di abort(), uno inerte faceva passare il test dell'Interrompi
+  //solo perche' il componente chiamava finishStreaming() due volte.
   mockAbort: vi.fn(() => {
     const stato = useEditorStore.getState()
     stato._abortController?.abort()
@@ -34,17 +29,14 @@ const { mockStart, mockAbort, capturedFn } = vi.hoisted(() => ({
   },
 }))
 
-// Mock di useAiStream con la nuova firma
 vi.mock('@/hooks/useAiStream', () => ({
   useAiStream: () => ({ start: mockStart, abort: mockAbort, status: 'idle' }),
 }))
 
-// Mock di useTypewriter
 vi.mock('@/hooks/useTypewriter', () => ({
   useTypewriter: (text: string) => text,
 }))
 
-// Mock di aiActions: getActiveText restituisce un testo lungo
 vi.mock('@/lib/aiActions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/aiActions')>()
   return { ...actual, getActiveText: vi.fn(() => ACTIVE_TEXT) }
@@ -52,7 +44,6 @@ vi.mock('@/lib/aiActions', async (importOriginal) => {
 
 import { getActiveText } from '@/lib/aiActions'
 
-// Mock della Facade api
 vi.mock('@/lib/api', () => ({
   api: {
     summarize: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
@@ -70,7 +61,6 @@ const ACTIVE_TEXT = 'testo di esempio abbastanza lungo per il test'
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getActiveText).mockReturnValue(ACTIVE_TEXT)
-  // Reset captured function
   capturedFn.value = null
   useEditorStore.setState({
     currentText: 'testo originale',
@@ -110,12 +100,10 @@ describe('AiActionDialog — body corretto', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    // Verifica che start sia chiamato con una funzione
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
     expect(fn).toBeInstanceOf(Function)
 
-    // Esegui la funzione per verificare che chiami la Facade corretta
     await fn(new AbortController().signal)
     expect(api.summarize).toHaveBeenCalledWith(ACTIVE_TEXT, 'medio', expect.any(AbortSignal))
   })
@@ -474,10 +462,6 @@ describe('AiActionDialog — chiusura durante la generazione (UC71)', () => {
   })
 })
 
-// L'anteprima appartiene alla richiesta che l'ha prodotta, non alla modale che
-// la ospita. Cambiare sorgente o parametro significa formulare una richiesta
-// diversa: cio' che si vede a video non e' piu' la risposta a cio' che la
-// modale sta chiedendo, e mostrarlo fa credere il contrario.
 describe('AiActionDialog — l anteprima non sopravvive al cambio di richiesta', () => {
   it('passando da «Da prompt» a «Da link» l anteprima si svuota', async () => {
     act(() => {
@@ -571,8 +555,6 @@ describe('AiActionDialog — l anteprima non sopravvive al cambio di richiesta',
     expect(useEditorStore.getState().streamedOutput).toBe('')
   })
 
-  // Anche l'errore appartiene alla richiesta di prima: lasciarlo sotto una
-  // richiesta diversa lo fa leggere come se riguardasse questa.
   it('l errore della richiesta precedente sparisce con essa', async () => {
     act(() => {
       useEditorStore.setState({
@@ -590,9 +572,6 @@ describe('AiActionDialog — l anteprima non sopravvive al cambio di richiesta',
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  // Il caso che azzerare non basta a coprire: con lo stream ancora aperto
-  // `appendChunk` continua a scrivere, e i chunk della lingua abbandonata
-  // ricompaiono nell'anteprima appena pulita.
   it('cambiare parametro durante la generazione annulla la richiesta in corso', async () => {
     const controller = new AbortController()
     act(() => {
@@ -613,10 +592,6 @@ describe('AiActionDialog — l anteprima non sopravvive al cambio di richiesta',
   })
 })
 
-// Il rovescio della medaglia dei test qui sopra: azzerare quando la richiesta
-// cambia non deve diventare azzerare a ogni clic. Un `PillSelector` emette
-// `onChange` anche quando si ri-clicca l'opzione gia' attiva, e senza guardia
-// l'utente perderebbe l'output per aver cliccato «Medio» due volte.
 describe('AiActionDialog — ri-cliccare la scelta gia attiva non azzera nulla', () => {
   it('ri-cliccare la lingua gia selezionata lascia l anteprima al suo posto', async () => {
     act(() => {
@@ -627,7 +602,6 @@ describe('AiActionDialog — ri-cliccare la scelta gia attiva non azzera nulla',
     })
     render(<AiActionDialog />)
 
-    // «Inglese» e' il default della modale di traduzione.
     await userEvent.click(screen.getByRole('radio', { name: 'Inglese' }))
 
     expect(useEditorStore.getState().streamedOutput).toBe(

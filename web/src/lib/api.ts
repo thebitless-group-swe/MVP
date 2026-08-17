@@ -3,10 +3,6 @@ import type { Length, Language, Style, Hat } from '@/types/models'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-/**
- * Facade per le operazioni AI.
- * Ogni metodo ritorna un AsyncIterable<string>.
- */
 export const api = {
   summarize: (text: string, length: Length = 'medio', signal?: AbortSignal) =>
     stream('/api/summarize', { text, length }, signal),
@@ -39,9 +35,7 @@ async function* stream(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    //UC71 post-condizione 1. Senza questa riga annullare fermava il consumo dei
-    //chunk ma lasciava la richiesta aperta: il backend non vedeva alcuna
-    //disconnessione e continuava a produrre lo stream fino a [DONE].
+    //Senza, annullare lascia la richiesta aperta e il backend produce fino in fondo (UC71).
     signal,
   })
 
@@ -74,11 +68,7 @@ async function* stream(
       yield event.data
     }
   } finally {
-    //Il `signal` copre l'annullamento esplicito; questo copre ogni altra uscita
-    //anticipata del consumatore — un `break`, un `return`, un errore a valle —
-    //che chiude questo generatore senza toccare il corpo della risposta. Il
-    //`catch` inerte serve perche' su uno stream gia' annullato `cancel()`
-    //rifiuta, e un rifiuto qui maschererebbe l'errore vero in uscita.
+    //Il catch vuoto serve perche' su uno stream gia' annullato cancel() rifiuta.
     await reader.cancel().catch(() => {})
   }
 }

@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useNotesStore, useNotesList, useCurrentNote } from '@/store/notes'
+import {
+  useNotesStore,
+  useNotesList,
+  useCurrentNote,
+  CONTENUTO_BENVENUTO,
+} from '@/store/notes'
 import { useEditorStore } from '@/store/useEditorStore'
 
 // Creiamo i mock delle funzioni prima del mock del modulo
@@ -51,15 +56,6 @@ beforeEach(() => {
   useNotesStore.setState({ list: [], currentId: null })
 })
 
-/*
- * R-114-F-Ob (UC74.3) — il titolo lo fornisce l'utente.
- *
- * L'asserzione `expect(title).toBe('Senza titolo')` che stava qui non
- * verificava un comportamento: ratificava il difetto, cioe' il titolo
- * assegnato d'ufficio. Per questo e' stata riscritta e non adattata. Il
- * valore di ripiego sopravvive in un test solo, quello che ne descrive
- * l'unica occasione legittima: la stringa vuota.
- */
 describe('useNotesStore — createEmpty', () => {
   it('crea la nota con il titolo indicato dall utente', () => {
     const { result } = renderHook(() => useNotesStore())
@@ -126,14 +122,6 @@ describe('useNotesStore — createEmpty', () => {
    * messaggio d'errore e la nota comparire nell'elenco — misurato: il
    * QuotaExceededError propaga da `set` **dopo** che lo stato in memoria e'
    * gia' cambiato.
-   */
-  /*
-   * Nota sulle asserzioni: si legge `useNotesStore.getState()` e non
-   * `result.current`. Quando l'eccezione interrompe l'`act` il componente non
-   * si ri-renderizza, quindi `result.current` resta lo snapshot precedente e
-   * l'asserzione passerebbe **anche senza ripristino**. Verificato per
-   * mutazione: con `result.current` la rimozione del ripristino non veniva
-   * intercettata da nessun test.
    */
   it('persistenza fallita senza nota corrente → nessuna nota resta nell elenco', () => {
     persistenzaRotta()
@@ -252,17 +240,6 @@ describe('useNotesStore — deleteNote', () => {
     expect(result.current.list).toHaveLength(0)
   })
 
-  /*
-   * I tre test qui sopra guardano lista e `currentId`, mai l'editor — ed e' il
-   * motivo per cui il difetto seguente e' sopravvissuto finche' nessun punto
-   * della UI raggiungeva `deleteNote`.
-   *
-   * Misurato prima della correzione: eliminando la nota corrente, il suo testo
-   * restava nell'editor mentre `currentId` passava a un'altra nota. Al primo
-   * cambio nota quel testo veniva salvato **sopra** la nota di destinazione:
-   * eliminando A (contenuto 'AAA') e poi selezionando B, il contenuto di B
-   * diventava 'AAA'. Perdita di dati silenziosa.
-   */
   it('eliminando la nota corrente, l editor carica quella che subentra', () => {
     const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
     const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
@@ -298,16 +275,6 @@ describe('useNotesStore — deleteNote', () => {
     expect(mockLoadDocument).not.toHaveBeenCalled()
   })
 
-  /*
-   * UC81, post-condizioni: «L'integrita' del dato viene preservata. La nota
-   * non viene eliminata. L'utente riceve un feedback sull'errore». Le prime
-   * due si verificano qui, la terza in `Sidebar.test.tsx`.
-   *
-   * Le asserzioni leggono `useNotesStore.getState()` e non `result.current`:
-   * quando l'eccezione interrompe l'`act` il componente non si ri-renderizza,
-   * quindi `result.current` resterebbe lo snapshot precedente e il test
-   * passerebbe anche senza ripristino.
-   */
   it('persistenza fallita → la nota NON viene eliminata e l errore propaga', () => {
     const noteA = { id: 'a', title: 'A', content: 'AAA', createdAt: 0, updatedAt: 0 }
     const noteB = { id: 'b', title: 'B', content: 'BBB', createdAt: 0, updatedAt: 0 }
@@ -365,5 +332,59 @@ describe('selettori', () => {
 
     const { result } = renderHook(() => useCurrentNote())
     expect(result.current).toBeNull()
+  })
+})
+describe('nota di benvenuto', () => {
+  beforeEach(() => {
+    act(() => {
+      useNotesStore.setState({ list: [], currentId: null })
+    })
+    mockLoadDocument.mockClear()
+  })
+
+  it('a lista vuota crea la nota di benvenuto e la rende corrente', () => {
+    act(() => {
+      useNotesStore.getState().ensureWelcomeNote()
+    })
+
+    const { list, currentId } = useNotesStore.getState()
+    expect(list).toHaveLength(1)
+    expect(list[0].title).toBe('Benvenuto')
+    expect(list[0].content).toBe(CONTENUTO_BENVENUTO)
+    expect(currentId).toBe(list[0].id)
+  })
+
+  it('il testo di benvenuto finisce nell editor', () => {
+    act(() => {
+      useNotesStore.getState().ensureWelcomeNote()
+    })
+
+    expect(mockLoadDocument).toHaveBeenCalledWith(CONTENUTO_BENVENUTO)
+  })
+
+  // Il caso che conta: chi ha gia' delle note non se la deve ritrovare davanti
+  // a ogni avvio, e soprattutto non deve perdere la nota su cui stava.
+  it('non fa nulla se esiste gia una nota', () => {
+    act(() => {
+      useNotesStore.getState().loadNote({
+        id: 'nota-mia', title: 'La mia nota', content: 'contenuto mio',
+      })
+      mockLoadDocument.mockClear()
+    })
+
+    act(() => {
+      useNotesStore.getState().ensureWelcomeNote()
+    })
+
+    const { list, currentId } = useNotesStore.getState()
+    expect(list).toHaveLength(1)
+    expect(list[0].title).toBe('La mia nota')
+    expect(currentId).toBe('nota-mia')
+    expect(mockLoadDocument).not.toHaveBeenCalled()
+  })
+
+  it('il testo contiene il titolo e la parte sugli strumenti di IA', () => {
+    expect(CONTENUTO_BENVENUTO).toContain('# Benvenuto su Second Brain')
+    expect(CONTENUTO_BENVENUTO).toContain('**strumenti di Intelligenza Artificiale**')
   })
 })

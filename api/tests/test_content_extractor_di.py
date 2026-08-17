@@ -1,18 +1,4 @@
-"""Test del provider `get_content_extractor` e dell'iniezione nella rotta.
-
-Le prime due proprieta' erano intrecciate nella stessa riga
-`extractor = TavilyExtractor()` dentro la rotta:
-
-1. chi decide quale implementazione usare e' il provider, non la rotta;
-2. una chiave assente e' un servizio indisponibile (503), non un errore di
-   programmazione (500).
-3. un'estrazione fallita e' l'altro 503 della rotta, con un `detail` diverso
-   dal precedente. Non riguarda la DI, e vive qui lo stesso: i due percorsi
-   rispondono lo stesso stato, quindi solo il `detail` li distingue, e un
-   test che li separa vale finche' si legge accanto a cio' da cui li separa.
-   Spostarlo altrove renderebbe possibile cambiare uno dei due messaggi senza
-   accorgersi che l'altro test smette di discriminare.
-"""
+"""Test del provider `get_content_extractor` e dell'iniezione nella rotta."""
 
 import logging
 from collections.abc import Iterator
@@ -89,11 +75,7 @@ class TestAdattatoreDisaccoppiatoDaiSettings:
     def test_si_costruisce_anche_senza_chiave_nell_ambiente(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """L'unica sorgente della chiave e' l'argomento passato.
-
-        Prima il costruttore leggeva `get_settings()`: con l'ambiente vuoto
-        falliva, e per istanziarlo in un test bisognava alterare l'ambiente.
-        """
+        """L'unica sorgente della chiave e' l'argomento passato."""
         monkeypatch.setenv("TAVILY_API_KEY", "")
         get_settings.cache_clear()
 
@@ -223,11 +205,7 @@ class TestRottaConEstrazioneFallita:
         )
 
     def test_la_causa_non_arriva_al_client(self, client: TestClient) -> None:
-        """Il messaggio dell'eccezione interna non deve uscire nel corpo.
-
-        `FetchError` ricopia il testo di `ContentExtractorError`, quindi senza
-        sanificazione la stringa del doppio finirebbe dritta nella risposta.
-        """
+        """Il messaggio dell'eccezione interna non deve uscire nel corpo."""
         response = client.post(
             "/api/generate-from-link", json={"url": "https://example.com"}
         )

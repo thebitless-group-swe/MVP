@@ -426,11 +426,6 @@ describe('useEditorStore — resetPreview', () => {
     expect(useEditorStore.getState().errorMessage).toBeNull()
   })
 
-  // Il motivo per cui `resetPreview` non e' `set({ streamedOutput: '' })` scritto
-  // sul posto. Azzerare mentre lo stream e' aperto non basta: il ciclo di
-  // `useAiStream` continua a chiamare `appendChunk`, e i chunk della richiesta
-  // che l'utente ha appena abbandonato ricompaiono nell'anteprima appena
-  // pulita. Prima si chiude la richiesta, poi si pulisce.
   it('annulla la richiesta in corso prima di azzerare (UC71)', () => {
     const controller = new AbortController()
 
@@ -452,8 +447,6 @@ describe('useEditorStore — resetPreview', () => {
     expect(useEditorStore.getState().streamedOutput).toBe('')
   })
 
-  // Cambiare sorgente o parametro riguarda la richiesta, non la nota: il testo
-  // dell'utente non e' output dell'IA e non va toccato.
   it('non tocca il testo della nota ne la selezione', () => {
     act(() => {
       useEditorStore.setState({

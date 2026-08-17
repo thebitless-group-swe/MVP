@@ -50,9 +50,6 @@ describe('parseSseStream — contenuto', () => {
     expect(out).toEqual(['# Titolo\n\n- uno\n- due'])
   })
 
-  // Il caso che riproponeva la perdita in forma piu' sottile: un chunk con
-  // `\n\n` produce una riga `data:` VUOTA, che non va confusa con l'assenza
-  // di dati.
   it('conserva una riga vuota interna al chunk', async () => {
     const out = await collectText([sse('prima\n\nseconda'), DONE])
 
@@ -121,8 +118,6 @@ describe('parseSseStream — i tre terminatori', () => {
     ])
   })
 
-  // E' il difetto §6.11: prima di questa correzione una chiusura senza
-  // terminatore era indistinguibile da un completamento riuscito.
   it('chiusura senza terminatore: fallimento, non successo', async () => {
     const events = await collect([sse('parziale')])
 
@@ -149,8 +144,6 @@ describe('parseSseStream — i tre terminatori', () => {
 })
 
 describe('parseSseStream — disambiguazione campo/contenuto', () => {
-  // Il parser fa dispatch sul NOME del campo, non con un match sulla riga. Su
-  // un'app che genera Markdown arbitrario un contenuto del genere e' possibile.
   it('un chunk il cui contenuto e letteralmente "event: error" arriva come testo', async () => {
     const events = await collect([sse('event: error'), DONE])
 

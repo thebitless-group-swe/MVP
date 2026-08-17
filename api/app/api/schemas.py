@@ -11,16 +11,8 @@ from ..core.domain.values import (
     Style,
 )
 
-# I vocabolari e le soglie vivono in core/domain/values.py: qui restano solo i
-# DTO, cioe' il confine HTTP. E' il confine il posto giusto per un eventuale
-# adattamento del vocabolario esterno a quello di dominio (vedi la nota in
-# values.py); il dominio non deve conoscere la forma della richiesta.
-
-# Etichette in italiano dei campi dei DTO, usate per comporre i messaggi di
-# errore 422 in linguaggio naturale (R-110-F-Ob). Stanno qui, accanto ai campi
-# che descrivono, cosi' che aggiungere un campo e la sua etichetta siano la
-# stessa modifica. Un campo assente da questa mappa produce un messaggio
-# generico: meglio vago che tecnico.
+#Servono per i messaggi di errore 422 (R-110-F-Ob). Se aggiungete un campo
+#aggiungete anche l'etichetta, senza esce un messaggio generico.
 FIELD_LABELS: dict[str, str] = {
     "text": "testo",
     "prompt": "istruzioni",
@@ -43,14 +35,13 @@ class GenerateRequest(BaseModel):
 
 
 class LinkRequest(BaseModel):
-    #HttpUrl valida schema e forma dell'url: input malformato -> 422
     url: HttpUrl
     length: Length = "medio"
 
 
 class TranslateRequest(BaseModel):
     text: str = Field(min_length=MIN_TEXT_LENGTH, max_length=MAX_TEXT_LENGTH)
-    #Nessun default: lingua, stile e cappello vanno scelti esplicitamente
+    #Senza default apposta, va scelta
     target_language: Language
 
 

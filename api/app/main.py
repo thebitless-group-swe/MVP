@@ -28,24 +28,9 @@ from .dependencies import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Rilascia allo shutdown le risorse dei singleton costruiti a runtime.
-
-    Entrambi gli adattatori tengono un pool di connessioni e vivono quanto il
-    processo (`@lru_cache`), ma nessuno dei due veniva chiuso: `aclose` esisteva
-    con la docstring «da invocare allo shutdown dell'app» e non era invocato da
-    nessuna parte. E' igiene, non un difetto che morde — un pool che resta
-    aperto fino alla morte di un processo che sta comunque terminando — ma senza
-    un lifespan non c'era il posto dove metterla.
-
-    Qui restano due chiamate e nessun adattatore concreto: come si chiuda
-    ciascuno dei due, e perche' le due chiusure abbiano forma diversa, e'
-    argomentato in `dependencies.py` accanto alle funzioni.
-    """
-    #Lo startup non e' piu' vuoto: una chiave mancante si scopre dal log di
-    #avvio, non dal primo utente. Sollevare qui fa uscire uvicorn invece di
-    #lasciarlo servire richieste che non puo' soddisfare. *Cosa* sia
-    #obbligatorio lo decide `dependencies.py`, che e' il modulo che sa quale
-    #chiave serve a quale provider.
+    """Controlli all'avvio e chiusura delle risorse allo spegnimento."""
+    #Sollevare qui fa uscire uvicorn invece di lasciarlo accettare richieste
+    #che non puo' soddisfare.
     verifica_chiavi_obbligatorie()
 
     yield
@@ -56,12 +41,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Second Brain API — PoC", lifespan=lifespan)
 
-#Ogni endpoint che accetta un corpo puo' rispondere 422. Dichiarare qui, in un
-#punto solo, che la forma di quella risposta e' ErrorResponse sostituisce lo
-#schema HTTPValidationError generato in automatico da FastAPI, che descrive una
-#forma (detail come array di oggetti) che l'applicazione non produce piu'.
-#Il contratto e il comportamento vanno cambiati insieme: altrimenti openapi.json
-#dichiara il falso e il frontend genera tipi che non corrispondono alle risposte.
+#Se cambiate la forma della risposta 422 cambiate anche questo, altrimenti
+#openapi.json dichiara il falso e il frontend genera tipi sbagliati.
 _VALIDATION_RESPONSE = {422: {"model": ErrorResponse}}
 
 app.add_middleware(
@@ -79,7 +60,6 @@ app.include_router(translate_router, responses=_VALIDATION_RESPONSE)
 app.include_router(rewrite_router, responses=_VALIDATION_RESPONSE)
 app.include_router(grammar_router, responses=_VALIDATION_RESPONSE)
 app.include_router(critique_router, responses=_VALIDATION_RESPONSE)
-#constants_router non accetta un corpo: per lui il 422 non e' raggiungibile.
 app.include_router(constants_router)
 
 
@@ -95,13 +75,11 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    """Uniforma il 422 alla stessa forma di ogni altro errore dell'API.
+    """Da' al 422 la stessa forma di ogni altro errore dell'API.
 
-    Senza questo handler `detail` e' un array di oggetti, mentre ErrorResponse
-    lo dichiara stringa e lo store del frontend lo tipizza `string | null`.
+    Senza, detail sarebbe un array di oggetti e il frontend lo tipizza stringa.
     """
     messages = [describe_validation_error(error) for error in exc.errors()]
-    #Piu' campi invalidi producono spesso la stessa frase: non ripeterla.
     unique = list(dict.fromkeys(messages))
     detail = " ".join(unique) or "I dati inviati non sono validi."
 

@@ -20,7 +20,5 @@ async def rewrite(
     request: Request,
     client: LLMClient = Depends(get_llm_client),
 ) -> StreamingResponse:
-    #Alias sull'import: il caso d'uso si chiama come questo handler, e il nome
-    #dell'handler non puo' cambiare perche' FastAPI ci deriva l'operationId.
     chunks = rewrite_service(payload.text, payload.style, client)
     return await sse_response(request, chunks, "riscrittura", logger)

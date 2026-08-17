@@ -1,9 +1,4 @@
-"""Test del LiteLLMClient: configurazione httpx, parsing SSE e mapping errori.
-
-Le richieste di rete sono sempre intercettate da httpx.MockTransport: nessun
-test tocca la rete reale. La fixture SSE (api/tests/fixtures/litellm_sse.txt)
-è una cattura reale dal gateway LiteLLM, usata per validare il parsing.
-"""
+"""Test del LiteLLMClient: configurazione httpx, parsing SSE e mapping errori."""
 
 import json
 from collections.abc import Callable
@@ -20,9 +15,6 @@ from app.infrastructure.adapters.litellm_client import (
 )
 from app.settings import Settings
 
-#Il dominio parla di Message: la forma a dizionario compare solo nel
-#payload che l'adattatore costruisce, ed e' quella che
-#test_stream_invia_payload_corretto verifica.
 MESSAGES = [Message(role="user", content="Riassumi questo testo.")]
 PAYLOAD_MESSAGES = [{"role": "user", "content": "Riassumi questo testo."}]
 
@@ -37,9 +29,6 @@ def make_client(handler: Callable[[httpx.Request], httpx.Response]) -> LiteLLMCl
     return client
 
 
-# --- #13 (POC-B-05): __init__ e setup httpx -------------------------------
-
-
 async def test_init_configura_client_httpx() -> None:
     settings = Settings(
         litellm_base_url="http://litellm:4000/v1",
@@ -48,9 +37,8 @@ async def test_init_configura_client_httpx() -> None:
     )
     client = LiteLLMClient(settings)
 
-    # httpx normalizza la base_url aggiungendo lo slash finale.
     assert str(client._client.base_url) == "http://litellm:4000/v1/"
-    # httpx normalizza la chiave header in minuscolo.
+    #httpx normalizza base_url con lo slash finale e l'header in minuscolo.
     assert client._client.headers["authorization"] == "Bearer chiave-segreta"
     assert client._client.timeout.read == READ_TIMEOUT_SECONDS
     assert client._client.timeout.connect == CONNECT_TIMEOUT_SECONDS
@@ -58,13 +46,6 @@ async def test_init_configura_client_httpx() -> None:
     await client.aclose()
 
 
-# I due timeout misurano guasti diversi e non possono avere lo stesso valore.
-# La connessione o si apre subito o il gateway non c'e': attenderla quanto si
-# attende un modello che genera vorrebbe dire tenere l'utente fermo per minuti
-# davanti a un servizio spento. La lettura, all'opposto, misura la pausa fra due
-# chunk, e con un modello grande la prima puo' durare piu' di un minuto: e' il
-# guasto che il valore unico di 60 s trasformava in un 503 su una richiesta che
-# stava solo andando piano.
 def test_la_lettura_attende_piu_a_lungo_della_connessione() -> None:
     assert CONNECT_TIMEOUT_SECONDS < READ_TIMEOUT_SECONDS
 
@@ -75,9 +56,6 @@ async def test_aclose_chiude_il_client() -> None:
     assert client._client.is_closed is False
     await client.aclose()
     assert client._client.is_closed is True
-
-
-# --- #14 (POC-B-06): stream() parsing SSE ---------------------------------
 
 
 async def test_stream_yielda_solo_delta_content(sse_chunks: str) -> None:
@@ -114,9 +92,6 @@ async def test_stream_invia_payload_corretto() -> None:
     await client.aclose()
 
 
-# UC67.3 passo 3: il tetto scelto dallo use case arriva al provider come
-# `max_tokens`. E' l'unico punto in cui una decisione di dominio prende il nome
-# che ha nel protocollo del fornitore, ed e' qui che si verifica.
 async def test_stream_invia_max_tokens_quando_lo_use_case_lo_chiede() -> None:
     captured: dict = {}
 
@@ -131,10 +106,6 @@ async def test_stream_invia_max_tokens_quando_lo_use_case_lo_chiede() -> None:
     await client.aclose()
 
 
-# Il contrario, ed e' la meta' che conta: per le quattro funzioni che riscrivono
-# un testo esistente la chiave non deve comparire affatto. Inviarla a zero, o a
-# un default qualunque, troncherebbe l'output; ometterla lascia decidere al
-# provider, che e' il comportamento voluto.
 async def test_stream_omette_del_tutto_max_tokens_quando_non_richiesto() -> None:
     captured: dict = {}
 
@@ -147,9 +118,6 @@ async def test_stream_omette_del_tutto_max_tokens_quando_non_richiesto() -> None
 
     assert "max_tokens" not in captured["payload"]
     await client.aclose()
-
-
-# --- #15 (POC-B-07): mapping errori -> LLMProviderError -------------------
 
 
 async def test_stream_mappa_timeout() -> None:

@@ -19,20 +19,12 @@ export default function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
 
-        {/*
-          Barra dedicata alla vista (Editor / Split / Render): separata dalle
-          azioni AI della TopBar e sempre visibile in ogni modalità, così è
-          possibile tornare a Editor/Split anche da "render".
-        */}
+        {/* Sta fuori dalla TopBar e resta visibile in ogni modalita', altrimenti
+            da "render" non si tornerebbe piu' indietro. */}
         <div className="flex items-center justify-end border-b border-border bg-background px-4 py-2">
           <ViewToggle />
         </div>
 
-        {/*
-          Layout in base alla vista selezionata (ViewToggle nella TopBar):
-          - split:        griglia responsive Editor | Preview
-          - editor/render: pannello singolo a tutta larghezza
-        */}
         <main
           className={
             viewMode === 'split'

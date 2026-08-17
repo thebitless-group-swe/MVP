@@ -17,6 +17,9 @@ from ...core.domain.values import (
 router = APIRouter(prefix="/api", tags=["constants"])
 
 
+#ATTENZIONE, il docstring qui sotto NON e' un commento. FastAPI lo esporta come
+#`description` dentro openapi.json, che e' committato e che la CI rigenera
+#pretendendo zero diff. Se lo toccate dovete rilanciare `export_openapi`.
 class ApiConstants(BaseModel):
     """Costanti del contratto lette dal frontend tramite openapi-typescript.
 

@@ -4,6 +4,12 @@ import type { Note } from '../lib/fileSystem'
 import { newId } from '../lib/id'
 import { useEditorStore } from './useEditorStore'
 
+export const CONTENUTO_BENVENUTO = `# Benvenuto su Second Brain 🧠
+
+Questo è il tuo nuovo spazio di lavoro intelligente per l'editing e la gestione della conoscenza. Oltre alla classica formattazione Markdown, Second Brain integra potenti **strumenti di Intelligenza Artificiale** per supportarti nella stesura e rielaborazione dei tuoi appunti.`
+
+const TITOLO_BENVENUTO = 'Benvenuto'
+
 type NotesState = {
   list: Note[]
   currentId: string | null
@@ -12,6 +18,7 @@ type NotesState = {
   updateCurrent: (patch: Partial<Pick<Note, 'title' | 'content'>>) => void
   deleteNote: (id: string) => void
   loadNote: (note: Omit<Note, 'createdAt' | 'updatedAt'> & { createdAt?: number; updatedAt?: number }) => void
+  ensureWelcomeNote: () => void
 }
 
 export const useNotesStore = create<NotesState>()(
@@ -21,39 +28,13 @@ export const useNotesStore = create<NotesState>()(
       currentId: null,
 
       /**
-       * Crea una nota con il titolo indicato dall'utente, o non lascia traccia
-       * di averci provato.
+       * Crea una nota, o non lascia traccia di averci provato (UC75).
        *
-       * **Il titolo lo fornisce chi chiama.** R-114-F-Ob (UC74.3) impone che
-       * sia *chiesto* in fase di creazione: prima qui c'era `'Senza titolo'`
-       * assegnato d'ufficio, che e' il difetto che questo parametro elimina.
-       * La ricaduta resta, ma solo per la stringa vuota, e sta qui e non nel
-       * chiamante perche' il punto di verita' dev'essere uno solo. Il `trim()`
-       * e' la stessa convenzione gia' adottata da `renameNote` in
-       * `lib/fileSystem.ts`.
-       *
-       * Il parametro ha un valore predefinito perche' non tutti i punti di
-       * creazione passano per la richiesta del titolo: chi chiama senza
-       * argomenti ottiene la nota «Senza titolo» di prima, che e' il
-       * comportamento che i test di persistenza e di secure context danno per
-       * scontato.
-       *
-       * **Il resto risponde a UC75**, che chiede due cose a chi gestisce un
-       * errore di creazione: informare l'utente — e quello tocca al chiamante,
-       * che ha l'interfaccia — e «ripristinare lo stato precedente per evitare
-       * perdite di dati», che tocca a qui. Da cui le due precauzioni:
-       *
-       * 1. l'id si genera **prima** di ogni mutazione, cosi' un suo fallimento
-       *    esce senza aver toccato nulla;
-       * 2. le mutazioni stanno in un `try` che, se qualcosa cede a meta',
-       *    rimette lo stato com'era e rilancia.
-       *
-       * Il punto 2 non e' teorico: **misurato**, un `QuotaExceededError` di
-       * `localStorage` propaga in modo sincrono da `set` attraverso il
-       * middleware `persist`, ma **dopo** che lo stato in memoria e' gia'
-       * cambiato. Senza ripristino l'utente vedrebbe il messaggio d'errore e
-       * insieme la nota comparire nell'elenco, con l'editor ancora sul
-       * contenuto della nota precedente.
+       * L'id si genera PRIMA di ogni mutazione e le mutazioni stanno in un try
+       * che rimette a posto. Non e' teorico: un QuotaExceededError di
+       * localStorage propaga da `set` dopo che lo stato in memoria e' gia'
+       * cambiato, quindi senza ripristino l'utente vede insieme l'errore e la
+       * nota comparire nell'elenco.
        */
       createEmpty: (title = '') => {
         const id = newId()
@@ -84,10 +65,8 @@ export const useNotesStore = create<NotesState>()(
           try {
             set(precedente)
           } catch {
-            // Se anche il ripristino non riesce a persistere, la persistenza
-            // e' gia' compromessa a monte: quello che conta qui e' che lo
-            // stato in memoria — l'unico che l'interfaccia legge — sia tornato
-            // indietro, e a quel punto lo e' gia'.
+            //Se nemmeno il ripristino persiste pazienza, quello che conta e'
+            //che lo stato in memoria sia gia' tornato indietro.
           }
           throw err
         }
@@ -120,29 +99,16 @@ export const useNotesStore = create<NotesState>()(
         })
       },
       /**
-       * Rimuove una nota dall'elenco e riallinea l'editor.
+       * Rimuove una nota dall'elenco e riallinea l'editor (UC81).
        *
-       * **Il caricamento del documento non e' un ornamento.** `select` e
-       * `loadNote` lo fanno gia'; `deleteNote` era l'unica delle tre a non
-       * farlo, e finche' nessun punto della UI la raggiungeva la cosa non si
-       * vedeva. Misurato: eliminando la nota corrente, il suo testo restava
-       * nell'editor mentre `currentId` passava a un'altra nota; al primo cambio
-       * nota quel testo veniva salvato **sopra** la nota di destinazione, che
-       * perdeva il proprio contenuto senza alcun segnale.
+       * Il loadDocument serve davvero: senza, eliminando la nota corrente il
+       * suo testo resta nell'editor e al primo cambio nota viene salvato SOPRA
+       * la nota di destinazione, che perde tutto senza segnale.
        *
-       * **Il ripristino risponde a UC81**, che di post-condizioni ne pretende
-       * tre: «L'integrita' del dato viene preservata. **La nota non viene
-       * eliminata.** L'utente riceve un feedback sull'errore». Le prime due
-       * stanno qui, la terza tocca al chiamante che ha l'interfaccia. E' lo
-       * stesso schema di `createEmpty`, non un secondo meccanismo.
-       *
-       * **Limite da dichiarare (R-91-F-De).** La rimozione e' a livello di
-       * applicazione: la nota sparisce dall'elenco e dalla persistenza locale,
-       * ma **il file su disco resta**. UC80.1 pretende la rimozione dal
-       * supporto fisico, che una pagina web non puo' fare su un file
-       * arbitrario — e Firefox, che R-1-V-Ob impone, non ha nemmeno la File
-       * System Access API. E' un requisito impossibile come specificato, non
-       * un requisito non implementato: va portato alla revisione dell'AdR.
+       * Limite da portare in revisione dell'AdR (R-91-F-De): la nota sparisce
+       * dall'elenco e dalla persistenza locale ma IL FILE SU DISCO RESTA. UC80.1
+       * pretende la rimozione dal supporto fisico, che una pagina web non puo'
+       * fare, e Firefox non ha nemmeno la File System Access API.
        */
       deleteNote: (id: string) => {
         const precedente = { list: get().list, currentId: get().currentId }
@@ -163,9 +129,7 @@ export const useNotesStore = create<NotesState>()(
           try {
             set(precedente)
           } catch {
-            // Vedi `createEmpty`: se nemmeno il ripristino persiste, quello che
-            // conta e' che lo stato in memoria — l'unico che l'interfaccia
-            // legge — sia gia' tornato indietro.
+            //Vedi createEmpty.
           }
           throw err
         }
@@ -189,6 +153,17 @@ loadNote: (noteData) => {
   })
   useEditorStore.getState().loadDocument(note.content)
 },
+
+      //Chi ha gia' delle note non deve vedersela comparire davanti, quindi si
+      //esce subito se la lista non e' vuota.
+      ensureWelcomeNote: () => {
+        if (get().list.length > 0) return
+        get().loadNote({
+          id: newId(),
+          title: TITOLO_BENVENUTO,
+          content: CONTENUTO_BENVENUTO,
+        })
+      },
     }),
     { name: 'notes_persistence', 
       onRehydrateStorage: () => (state) => {
@@ -196,13 +171,17 @@ loadNote: (noteData) => {
         const currentNote = state.list.find((n) => n.id === state.currentId)
         if (currentNote) {
           useEditorStore.getState().loadDocument(currentNote.content)
+          return
         }
+        //Primo avvio, o l'utente ha svuotato tutto. Si usa `state` e non
+        //useNotesStore: qui lo store si sta ancora creando, quindi la sua
+        //const e' in temporal dead zone e leggerla solleva in silenzio.
+        state.ensureWelcomeNote()
       }
     }
   )
 )
 
-// Selettori granulari
 export const useNotesList = () => useNotesStore((s) => s.list)
 export const useCurrentNote = () =>
   useNotesStore((s) => s.list.find((n) => n.id === s.currentId) ?? null)

@@ -1,14 +1,4 @@
-"""Test B-11: gestione di LLMProviderError nella route POST /api/summarize.
-
-Verifica il contratto del caso d'errore provider (UC 62):
-  - status 503
-  - body {"detail": "Servizio temporaneamente non disponibile"}
-  - nessun leak di api_key, stacktrace o nome dell'eccezione interna.
-
-Il provider e' simulato da DummyErrorLLMClient, il cui stream() solleva
-LLMProviderError prima di emettere qualunque chunk (caso "early"): la route
-deve intercettarlo PRIMA di restituire StreamingResponse e rispondere 503.
-"""
+"""Test B-11: gestione di LLMProviderError nella route POST /api/summarize."""
 from collections.abc import AsyncIterator, Sequence
 
 import pytest
@@ -68,7 +58,7 @@ class TestLLMProviderError503:
     def test_llm_provider_error_detail_message(self, client: TestClient) -> None:
         response = client.post("/api/summarize", json={"text": VALID_TEXT})
 
-        #Messaggio esatto vincolato da UC 62.
+        #Messaggio esatto vincolato da UC72.
         assert response.json()["detail"] == "Servizio temporaneamente non disponibile"
 
     def test_llm_provider_error_no_api_key_leak(self, client: TestClient) -> None:

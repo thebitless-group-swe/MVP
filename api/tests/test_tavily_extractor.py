@@ -1,15 +1,4 @@
-"""Test dell'adattatore Tavily.
-
-Il servizio Tavily non viene mai contattato: l'adattatore e' costruito con una
-chiave fittizia e il collaboratore privato `_client` e' sostituito da un doppio.
-E' il precedente gia' adottato in test_llm_client.py::make_client, ed e' una
-scelta consapevole: mockare la classe `TavilyClient` neutralizzerebbe anche il
-costruttore dell'adattatore, che deve invece restare eseguibile e testabile.
-
-Il doppio e' un MagicMock e non un AsyncMock perche' `_client.extract` e' una
-API sincrona: un AsyncMock restituirebbe una coroutine e la successiva
-`response.get(...)` fallirebbe per un motivo estraneo a cio' che il test verifica.
-"""
+"""Test dell'adattatore Tavily."""
 
 import asyncio
 import contextlib
@@ -32,14 +21,7 @@ PREFISSO_ERRORE_CLIENT = "Errore durante l'estrazione:"
 
 
 def test_il_costruttore_senza_chiave_rifiuta_di_costruire_l_adattatore() -> None:
-    """La guardia della riga 19 e' difesa in profondita', non il percorso normale.
-
-    Attraverso `get_content_extractor` non si arriva mai qui: il provider
-    controlla la chiave per primo e risponde 503. Questa guardia serve a chi
-    costruisce l'adattatore altrove — un secondo composition root, uno script —
-    e senza di essa otterrebbe un `TavilyClient` costruito su una chiave vuota,
-    che fallisce molto piu' tardi e per un motivo che non nomina la causa.
-    """
+    """La guardia della riga 19 e' difesa in profondita', non il percorso normale."""
     with pytest.raises(ContentExtractorError) as exc_info:
         TavilyExtractor(api_key="")
 
@@ -64,15 +46,8 @@ def make_extractor_guasto(errore: Exception) -> TavilyExtractor:
     return extractor
 
 
-# Estrazione riuscita → l'adattatore restituisce il raw_content, invariato
 async def test_estrazione_riuscita_restituisce_il_raw_content_invariato() -> None:
-    """Il percorso felice, asserito per quello che e'.
-
-    I test su `to_thread` piu' sotto attraversano gia' questa riga, ma lo fanno
-    di striscio: verificano dove gira la chiamata, non che cosa torna. Un
-    troncamento sbagliato o un `raw_content` scambiato con un altro campo li
-    lascerebbe verdi tutti quanti.
-    """
+    """Il percorso felice, asserito per quello che e'."""
     pagina = "# Titolo\n\nCorpo della pagina estratta."
     extractor = make_extractor({"results": [{"raw_content": pagina}]})
 
@@ -81,15 +56,8 @@ async def test_estrazione_riuscita_restituisce_il_raw_content_invariato() -> Non
     assert result == pagina
 
 
-# aclose() → chiude la sessione HTTP del client Tavily
 async def test_aclose_chiude_la_sessione_del_client() -> None:
-    """La delega, asserita dove e' osservabile: su un doppio.
-
-    Su una `requests.Session` vera `close()` non lascia stato pubblico che un
-    test possa leggere, quindi il cablaggio verso il lifespan puo' solo
-    verificare che il metodo venga invocato (test_lifespan.py). Qui, con il
-    client finto, la delega e' verificabile in modo diretto.
-    """
+    """La delega, asserita dove e' osservabile: su un doppio."""
     extractor = make_extractor({"results": [{"raw_content": "x"}]})
 
     await extractor.aclose()
@@ -97,15 +65,8 @@ async def test_aclose_chiude_la_sessione_del_client() -> None:
     extractor._client.close.assert_called_once_with()
 
 
-# Nessun risultato → pagina inesistente o vuota
 async def test_risultati_vuoti_segnalano_una_pagina_inesistente_o_vuota() -> None:
-    """Asserire il tipo non basterebbe: da `extract` escono tre errori uguali.
-
-    `ContentExtractorError` e' l'unico tipo che questo metodo solleva, quindi
-    un test sul solo tipo passerebbe anche se la pagina vuota finisse a
-    segnalare il guasto del client. E' il messaggio a distinguere le tre cause,
-    ed e' sul messaggio che il test si appoggia.
-    """
+    """Asserire il tipo non basterebbe: da `extract` escono tre errori uguali."""
     extractor = make_extractor({"results": []})
 
     with pytest.raises(ContentExtractorError) as exc_info:
@@ -116,7 +77,6 @@ async def test_risultati_vuoti_segnalano_una_pagina_inesistente_o_vuota() -> Non
     assert not messaggio.startswith(PREFISSO_ERRORE_CLIENT)
 
 
-# Risultato presente ma senza testo → pagina senza contenuto estraibile
 @pytest.mark.parametrize(
     ("primo_risultato", "caso"),
     [
@@ -127,12 +87,7 @@ async def test_risultati_vuoti_segnalano_una_pagina_inesistente_o_vuota() -> Non
 async def test_raw_content_assente_o_vuoto_segnala_una_pagina_senza_testo(
     primo_risultato: dict, caso: str
 ) -> None:
-    """Due forme diverse della stessa risposta, e Tavily le produce entrambe.
-
-    `results[0].get("raw_content", "")` le appiattisce sullo stesso valore: il
-    parametro serve a impedire che il default sparisca dal `get` senza che
-    nulla se ne accorga.
-    """
+    """Due forme diverse della stessa risposta, e Tavily le produce entrambe."""
     extractor = make_extractor({"results": [primo_risultato]})
 
     with pytest.raises(ContentExtractorError) as exc_info:
@@ -143,19 +98,8 @@ async def test_raw_content_assente_o_vuoto_segnala_una_pagina_senza_testo(
     assert not messaggio.startswith(PREFISSO_ERRORE_CLIENT), caso
 
 
-# Il client solleva → l'errore diventa un errore della porta, causa conservata
 async def test_un_errore_del_client_diventa_un_errore_di_porta() -> None:
-    """E' il confine dell'esagono: fuori di qui nessuno conosce Tavily.
-
-    Il `from exc` conta quanto la traduzione. La rotta registra lo stacktrace e
-    mostra all'utente un messaggio pulito (R-110-F-Ob): senza la causa
-    concatenata, lato server resterebbe soltanto il messaggio riscritto e la
-    diagnosi ripartirebbe da zero. Stesso idioma di
-    test_generate_from_link_service.py.
-
-    Il test prova anche che l'eccezione sopravvive al salto di thread di
-    `asyncio.to_thread`, che e' cio' che la #05 ha introdotto sotto a questa riga.
-    """
+    """E' il confine dell'esagono: fuori di qui nessuno conosce Tavily."""
     guasto = ConnectionError("connessione rifiutata dall'host")
     extractor = make_extractor_guasto(guasto)
 
@@ -167,7 +111,6 @@ async def test_un_errore_del_client_diventa_un_errore_di_porta() -> None:
     assert exc_info.value.__cause__ is guasto
 
 
-# Contenuto oltre il cap → l'adattatore lo tronca a MAX_CHARS
 async def test_extract_truncates_content_longer_than_max_chars() -> None:
     long_content = "a" * (MAX_CHARS + 8_000)
     extractor = make_extractor({"results": [{"raw_content": long_content}]})
@@ -206,11 +149,7 @@ def make_extractor_lento(client: ClientLento) -> TavilyExtractor:
 
 
 async def test_la_chiamata_sincrona_non_gira_sul_thread_dell_event_loop() -> None:
-    """Verifica deterministica di `to_thread`, senza dipendere dai tempi.
-
-    Se `extract` tornasse a essere invocato direttamente, il client verrebbe
-    eseguito sullo stesso thread del loop e questo confronto fallirebbe.
-    """
+    """Verifica deterministica di `to_thread`, senza dipendere dai tempi."""
     client = ClientLento(ritardo=0)
     extractor = make_extractor_lento(client)
     thread_del_loop = threading.get_ident()
@@ -222,12 +161,7 @@ async def test_la_chiamata_sincrona_non_gira_sul_thread_dell_event_loop() -> Non
 
 
 async def test_due_estrazioni_concorrenti_non_bloccano_l_event_loop() -> None:
-    """Due estrazioni insieme devono sovrapporsi, e il loop restare vivo.
-
-    Il battito e' la parte che conta: misura cio' che il bug causava davvero,
-    cioe' un'API ferma per tutti mentre una sola richiesta aspetta la rete.
-    Con la chiamata bloccante non girerebbe nemmeno una volta.
-    """
+    """Due estrazioni insieme devono sovrapporsi, e il loop restare vivo."""
     client = ClientLento()
     extractor = make_extractor_lento(client)
 

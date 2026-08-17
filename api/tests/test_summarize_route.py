@@ -24,7 +24,6 @@ def _override_llm_client():
     #Cancella il dummy DOPO il test (teardown)
     app.dependency_overrides.clear()
 
-#Controlla lo status code ed il contenuto dell'header
 def test_returns_200_and_sse_content_type(client: TestClient) -> None:
     response = client.post(
         "/api/summarize",
@@ -36,7 +35,6 @@ def test_returns_200_and_sse_content_type(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
 
-#Controlla che i chunk del dummy arrivino formattati correttamente secondo standard SSE
 def test_streams_dummy_chunks_in_sse_format(client: TestClient) -> None:
     response = client.post(
         "/api/summarize",
@@ -51,7 +49,6 @@ def test_streams_dummy_chunks_in_sse_format(client: TestClient) -> None:
     assert "data: chunk2 \n\n" in body
     assert "data: fine\n\n" in body
 
-#Controlla che il marker di fine stream sia corretto ("[DONE]\n\n")
 def test_terminates_with_done_marker(client: TestClient) -> None:
     response = client.post(
         "/api/summarize",
@@ -62,13 +59,11 @@ def test_terminates_with_done_marker(client: TestClient) -> None:
 
     assert response.text.endswith("data: [DONE]\n\n")
 
-#Controlla che i testi troppo corti per essere riassunti vengano bloccati con errore 422
 def test_validation_error_on_short_text(client: TestClient) -> None:
     response = client.post("/api/summarize", json={"text": "corto"})
 
     assert response.status_code == 422
 
-#Controlla che i chunks vengano ricevuti e formattati correttamente
 def test_endpoint_uses_injected_client() -> None:
     dummy_chunks = ["AAA", "BBB"]
     app.dependency_overrides[get_llm_client] = lambda: DummyLLMClient(dummy_chunks)
@@ -108,9 +103,6 @@ class _DisconnectedRequest:
         return True
 
 
-#Controlla che la disconnessione del client emetta effettivamente un log.
-#Invoca direttamente summarize() con un Request fake, perché httpx.ASGITransport
-#non propaga correttamente il disconnect al server.
 @pytest.mark.asyncio
 async def test_disconnect_emits_log(caplog) -> None:
     from app.api.routes.summarize import summarize

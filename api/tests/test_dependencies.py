@@ -1,18 +1,4 @@
-"""Test del composition root.
-
-Verifica le due proprieta' che rendono `dependencies.py` utile invece che solo
-ordinato: che ogni dipendenza sia sostituibile in un test, e che il vecchio
-punto di composizione non sia sopravvissuto come alias.
-
-Le tre dipendenze sono sostituibili, ma non dallo stesso meccanismo, e questi
-test rispecchiano l'asimmetria invece di nasconderla. `get_llm_client` e
-`get_content_extractor` sono dichiarate con `Depends` nelle rotte, quindi
-FastAPI le risolve passando da `dependency_overrides`. `get_settings` no:
-nessuna rotta la inietta — la chiamano `main.py` e gli altri due provider — e si
-controlla con l'ambiente piu' `cache_clear()`. Un test che la infilasse in
-`dependency_overrides` passerebbe senza verificare niente, perche' quell'entrata
-non verrebbe mai consultata: sarebbe un test verde su un meccanismo inattivo.
-"""
+"""Test del composition root."""
 import importlib
 from collections.abc import Iterator
 
@@ -192,12 +178,7 @@ class TestIDueProviderSiComportanoAllostessoModo:
         variabile: str,
         provider: object,
     ) -> None:
-        """R-110-F-Ob: causa e azione, senza tecnicismi.
-
-        Vale per la risposta HTTP, al contrario del log di avvio: la' il nome
-        della variabile e' l'informazione utile, qui sarebbe un dettaglio di
-        configurazione esposto a chi usa il prodotto.
-        """
+        """R-110-F-Ob: causa e azione, senza tecnicismi."""
         monkeypatch.setenv(variabile, "")
         get_settings.cache_clear()
 
