@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button'
 
 export function ViewToggle() {
   const viewMode = useViewMode()
-  // Estrai l'azione dallo store per aggiornare la vista
   const setViewMode = useEditorStore((state) => state.setViewMode)
 
   return (

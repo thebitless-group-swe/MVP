@@ -1,0 +1,24 @@
+import logging
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
+
+from ...core.ports.llm_client import LLMClient
+from ...core.services.translate import translate as translate_service
+from ...dependencies import get_llm_client
+from ..schemas import TranslateRequest
+from ..sse_streaming import sse_response
+
+router = APIRouter(prefix="/api", tags=["translate"])
+
+logger = logging.getLogger(__name__)
+
+
+@router.post("/translate")
+async def translate(
+    payload: TranslateRequest,
+    request: Request,
+    client: LLMClient = Depends(get_llm_client),
+) -> StreamingResponse:
+    chunks = translate_service(payload.text, payload.target_language, client)
+    return await sse_response(request, chunks, "traduzione", logger)

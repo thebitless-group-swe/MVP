@@ -1,24 +1,13 @@
-"""Test B-11: gestione di LLMProviderError nella route POST /api/summarize.
-
-Verifica il contratto del caso d'errore provider (UC 62):
-  - status 503
-  - body {"detail": "Servizio temporaneamente non disponibile"}
-  - nessun leak di api_key, stacktrace o nome dell'eccezione interna.
-
-Il provider e' simulato da DummyErrorLLMClient, il cui stream() solleva
-LLMProviderError prima di emettere qualunque chunk (caso "early"): la route
-deve intercettarlo PRIMA di restituire StreamingResponse e rispondere 503.
-"""
-from collections.abc import AsyncIterator
+"""Test B-11: gestione di LLMProviderError nella route POST /api/summarize."""
+from collections.abc import AsyncIterator, Sequence
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.llm import get_llm_client
-from app.llm.client import LLMClient
-from app.llm.errors import LLMProviderError
+from app.core.domain.values import Message
+from app.core.ports.llm_client import LLMClient, LLMProviderError
+from app.dependencies import get_llm_client, get_settings
 from app.main import app
-from app.settings import get_settings
 
 #Valore fittizio e riconoscibile: se comparisse nella response sarebbe un leak.
 SENTINEL_API_KEY = "sk-SECRET-SENTINEL-12345"
@@ -36,7 +25,9 @@ class DummyErrorLLMClient(LLMClient):
     che, anche se l'eccezione interna la contiene, non trapela al client.
     """
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         raise LLMProviderError(
             f"Errore interno provider con chiave {SENTINEL_API_KEY}"
         )
@@ -67,7 +58,7 @@ class TestLLMProviderError503:
     def test_llm_provider_error_detail_message(self, client: TestClient) -> None:
         response = client.post("/api/summarize", json={"text": VALID_TEXT})
 
-        #Messaggio esatto vincolato da UC 62.
+        #Messaggio esatto vincolato da UC72.
         assert response.json()["detail"] == "Servizio temporaneamente non disponibile"
 
     def test_llm_provider_error_no_api_key_leak(self, client: TestClient) -> None:

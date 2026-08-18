@@ -1,16 +1,18 @@
 import asyncio
 import logging
 import warnings
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.llm import get_llm_client
-from app.llm.client import LLMClient
+from app.core.domain.values import Message
+from app.core.ports.llm_client import LLMClient
+from app.dependencies import get_llm_client
 from app.main import app
 from tests.conftest import DummyLLMClient
+
 
 #Sostituisce il LiteLLMClient con il dummy prima di OGNI test (autouse=True)
 #Una volta finito lo rimuove
@@ -22,7 +24,6 @@ def _override_llm_client():
     #Cancella il dummy DOPO il test (teardown)
     app.dependency_overrides.clear()
 
-#Controlla lo status code ed il contenuto dell'header
 def test_returns_200_and_sse_content_type(client: TestClient) -> None:
     response = client.post(
         "/api/summarize",
@@ -34,7 +35,6 @@ def test_returns_200_and_sse_content_type(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
 
-#Controlla che i chunk del dummy arrivino formattati correttamente secondo standard SSE
 def test_streams_dummy_chunks_in_sse_format(client: TestClient) -> None:
     response = client.post(
         "/api/summarize",
@@ -49,7 +49,6 @@ def test_streams_dummy_chunks_in_sse_format(client: TestClient) -> None:
     assert "data: chunk2 \n\n" in body
     assert "data: fine\n\n" in body
 
-#Controlla che il marker di fine stream sia corretto ("[DONE]\n\n")
 def test_terminates_with_done_marker(client: TestClient) -> None:
     response = client.post(
         "/api/summarize",
@@ -60,13 +59,11 @@ def test_terminates_with_done_marker(client: TestClient) -> None:
 
     assert response.text.endswith("data: [DONE]\n\n")
 
-#Controlla che i testi troppo corti per essere riassunti vengano bloccati con errore 422
 def test_validation_error_on_short_text(client: TestClient) -> None:
     response = client.post("/api/summarize", json={"text": "corto"})
 
     assert response.status_code == 422
 
-#Controlla che i chunks vengano ricevuti e formattati correttamente
 def test_endpoint_uses_injected_client() -> None:
     dummy_chunks = ["AAA", "BBB"]
     app.dependency_overrides[get_llm_client] = lambda: DummyLLMClient(dummy_chunks)
@@ -92,7 +89,9 @@ def test_endpoint_uses_injected_client() -> None:
 class SlowDummyLLMClient(LLMClient):
     CHUNKS = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
-    async def stream(self, messages: list[dict]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         for chunk in self.CHUNKS:
             await asyncio.sleep(0.05)
             yield chunk
@@ -104,15 +103,12 @@ class _DisconnectedRequest:
         return True
 
 
-#Controlla che la disconnessione del client emetta effettivamente un log.
-#Invoca direttamente summarize() con un Request fake, perché httpx.ASGITransport
-#non propaga correttamente il disconnect al server.
 @pytest.mark.asyncio
 async def test_disconnect_emits_log(caplog) -> None:
-    from app.routes.summarize import summarize
-    from app.schemas import TextRequest
+    from app.api.routes.summarize import summarize
+    from app.api.schemas import TextRequest
 
-    caplog.set_level(logging.INFO, logger="app.routes.summarize")
+    caplog.set_level(logging.INFO, logger="app.api.routes.summarize")
 
     response = await summarize(
         payload=TextRequest(text="Testo abbastanza lungo, Lorem Ipsum dolor sit amet"),
@@ -152,7 +148,7 @@ async def test_disconnects_does_not_leave_pending_tasks() -> None:
 
     pending = [
         w for w in caught
-        if "task" in str(w.message).lower() and "pending" in str("w.message").lower()
+        if "task" in str(w.message).lower() and "pending" in str(w.message).lower()
     ]
 
     assert not pending, f"Trovati warning task pending: {pending}"

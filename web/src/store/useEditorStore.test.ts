@@ -16,6 +16,8 @@ beforeEach(() => {
     isGenerating: false,
     errorMessage: null,
     aiModal: null,
+    _abortController: null,
+    _loadVersion: 0,
   })
 })
 
@@ -42,6 +44,51 @@ describe('useEditorStore', () => {
       result.current.reset()
     })
     expect(result.current.currentText).toBe('')
+  })
+})
+
+describe('useEditorStore — loadDocument', () => {
+  it('aggiorna currentText come setCurrentText', () => {
+    const { result } = renderHook(() => useEditorStore())
+    act(() => {
+      result.current.loadDocument('nota caricata')
+    })
+    expect(result.current.currentText).toBe('nota caricata')
+  })
+
+  it('incrementa _loadVersion a ogni caricamento con testo diverso', () => {
+    const { result } = renderHook(() => useEditorStore())
+    expect(result.current._loadVersion).toBe(0)
+    act(() => {
+      result.current.loadDocument('nota A')
+    })
+    expect(result.current._loadVersion).toBe(1)
+    act(() => {
+      result.current.loadDocument('nota B')
+    })
+    expect(result.current._loadVersion).toBe(2)
+  })
+
+  it('non incrementa _loadVersion se il testo è identico a quello corrente', () => {
+    const { result } = renderHook(() => useEditorStore())
+    act(() => {
+      result.current.loadDocument('stesso testo')
+    })
+    expect(result.current._loadVersion).toBe(1)
+    act(() => {
+      result.current.loadDocument('stesso testo')
+    })
+    // Senza questa guardia in loadDocument, Editor.tsx scambierebbe la
+    // prossima modifica reale per un caricamento (vedi #24, caso limite).
+    expect(result.current._loadVersion).toBe(1)
+  })
+
+  it('setCurrentText non tocca _loadVersion (percorso digitazione utente)', () => {
+    const { result } = renderHook(() => useEditorStore())
+    act(() => {
+      result.current.setCurrentText('digitato dall\'utente')
+    })
+    expect(result.current._loadVersion).toBe(0)
   })
 })
 
@@ -133,7 +180,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
       result.current.setCurrentText('testo originale')
     })
     act(() => {
-      result.current.insertOutputIntoNote()
+      result.current.insertOutputIntoNote('replace')
     })
     expect(result.current.currentText).toBe('testo originale')
   })
@@ -147,7 +194,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('contenuto generato')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe(
         'testo originale\n\ncontenuto generato',
@@ -163,7 +210,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('solo output')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe('solo output')
     })
@@ -176,7 +223,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('riga due')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe('riga uno\nriga due')
     })
@@ -190,7 +237,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('contenuto nuovo')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe(
         'prima parola dopo\n\ncontenuto nuovo',
@@ -205,7 +252,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('\n\n  output  \n')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('append')
       })
       expect(result.current.currentText).toBe('base\n\noutput')
     })
@@ -221,7 +268,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('nuovo')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.currentText).toBe('prima nuovo dopo')
       expect(result.current.streamedOutput).toBe('')
@@ -237,7 +284,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('riassunto')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.currentText).toBe('riassunto')
       expect(result.current.streamedOutput).toBe('')
@@ -253,7 +300,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('riassunto')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.currentText).toBe('riassunto')
     })
@@ -265,7 +312,7 @@ describe('useEditorStore — insertOutputIntoNote', () => {
         result.current.appendChunk('out')
       })
       act(() => {
-        result.current.insertOutputIntoNote()
+        result.current.insertOutputIntoNote('replace')
       })
       expect(result.current.aiModal).toBeNull()
     })
@@ -302,5 +349,126 @@ describe('useEditorStore — discardOutput', () => {
     })
     expect(result.current.currentText).toBe('nota intatta')
     expect(useEditorStore.getState().selectedText).toBe('parola')
+  })
+})
+
+describe('useEditorStore — abortStream', () => {
+  it('abortStream chiama abort sul controller e lo azzera', () => {
+    const controller = new AbortController()
+    const abortSpy = vi.spyOn(controller, 'abort')
+
+    act(() => {
+      useEditorStore.setState({ _abortController: controller })
+    })
+
+    act(() => {
+      useEditorStore.getState().abortStream()
+    })
+
+    expect(abortSpy).toHaveBeenCalledTimes(1)
+    expect(useEditorStore.getState()._abortController).toBeNull()
+  })
+
+  it('abortStream con controller null non lancia errori', () => {
+    expect(() => {
+      act(() => {
+        useEditorStore.getState().abortStream()
+      })
+    }).not.toThrow()
+  })
+})
+
+describe('useEditorStore — abortStream (UC71 / R-109-F-De)', () => {
+  it('annulla il controller e spegne subito l indicatore di attesa', () => {
+    const controller = new AbortController()
+
+    act(() => {
+      useEditorStore.setState({ _abortController: controller, isGenerating: true })
+    })
+
+    act(() => {
+      useEditorStore.getState().abortStream()
+    })
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState()._abortController).toBeNull()
+  })
+
+  it('e innocuo quando non c e nulla da annullare', () => {
+    act(() => {
+      useEditorStore.setState({ _abortController: null, isGenerating: false })
+    })
+
+    expect(() => {
+      act(() => {
+        useEditorStore.getState().abortStream()
+      })
+    }).not.toThrow()
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+  })
+})
+
+describe('useEditorStore — resetPreview', () => {
+  it('azzera anteprima ed errore della richiesta precedente', () => {
+    act(() => {
+      useEditorStore.setState({
+        streamedOutput: 'la traduzione in inglese di prima',
+        errorMessage: 'errore della richiesta precedente',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+    expect(useEditorStore.getState().errorMessage).toBeNull()
+  })
+
+  it('annulla la richiesta in corso prima di azzerare (UC71)', () => {
+    const controller = new AbortController()
+
+    act(() => {
+      useEditorStore.setState({
+        _abortController: controller,
+        isGenerating: true,
+        streamedOutput: 'meta della traduzione in inglese',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState()._abortController).toBeNull()
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('non tocca il testo della nota ne la selezione', () => {
+    act(() => {
+      useEditorStore.setState({
+        currentText: 'nota intatta',
+        selectedText: 'parola',
+        streamedOutput: 'output da scartare',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(useEditorStore.getState().currentText).toBe('nota intatta')
+    expect(useEditorStore.getState().selectedText).toBe('parola')
+  })
+
+  it('e innocuo quando non c e nulla da azzerare', () => {
+    expect(() => {
+      act(() => {
+        useEditorStore.getState().resetPreview()
+      })
+    }).not.toThrow()
   })
 })

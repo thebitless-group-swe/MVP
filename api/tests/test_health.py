@@ -1,22 +1,14 @@
-"""Test del health endpoint GET / e del singleton Settings.
-
-Verifica che:
-1. La route ritorni shape {"status": "ok", "model": <str>}.
-2. Il campo `model` rifletta il valore corrente di get_settings().litellm_model.
-3. Modifiche runtime al singleton settings vengano riflesse nella risposta
-   (verifica indirettamente che la route non hardcodi il valore).
-"""
+"""Test del health endpoint GET / e del singleton Settings."""
 import pytest
 from fastapi.testclient import TestClient
 
-from app.settings import get_settings
+from app.dependencies import get_settings
 
 
 class TestHealthEndpoint:
     """Verifica shape e dinamicità della route GET /."""
 
     def test_health_ritorna_status_ok(self, client: TestClient) -> None:
-        """La route ritorna 200 con status='ok'."""
         response = client.get("/")
 
         assert response.status_code == 200
@@ -41,7 +33,7 @@ class TestHealthEndpoint:
         assert response.json()["model"] == "test-model-override"
 
     def test_health_shape_solo_status_e_model(self, client: TestClient) -> None:
-        """Il body contiene solo `status` e `model`: niente campi extra che potrebbero leakare configurazione."""
+        """Niente campi extra oltre a status e model, leakerebbero configurazione."""
         response = client.get("/")
 
         body = response.json()

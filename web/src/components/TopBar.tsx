@@ -1,39 +1,25 @@
-import type { ReactNode } from 'react'
 import {
+  Brain,
   Languages,
   Sparkles,
   Wand2,
   FileText,
+  SpellCheck,
 } from 'lucide-react'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { useLlmStream } from '@/hooks/useLlmStream'
 import { useCurrentNote } from '@/store/notes'
 import {
   useAiModal,
   useEditorStore,
   useErrorMessage,
   useIsGenerating,
+  type AiActionId,  
 } from '@/store/useEditorStore'
 
-type AiAction = {
-  label: string
-  icon: ReactNode
-}
 
-const disabledActions: AiAction[] = [
-  { label: 'Migliora', icon: <Wand2 aria-hidden="true" /> },
-  { label: 'Traduci', icon: <Languages aria-hidden="true" /> },
-  {
-    label: 'Analisi',
-    icon: (
-      <span aria-hidden="true" className="grayscale brightness-0 opacity-100">
-        🧢
-      </span>
-    ),
-  },
-]
+
 
 export interface TopBarProps {
   /** Override esplicito del titolo; se assente usa la nota corrente dello store. */
@@ -41,25 +27,24 @@ export interface TopBarProps {
 }
 
 export function TopBar({ noteTitle }: TopBarProps) {
-  const { abort } = useLlmStream()
   const isGenerating = useIsGenerating()
   const errorMessage = useErrorMessage()
   const aiModal = useAiModal()
   const currentNote = useCurrentNote()
-  const showStreamingUi = isGenerating && aiModal === null
+  const showStreamingUi = isGenerating
+
+  const handleAbort = () => useEditorStore.getState().abortStream()
 
   // Titolo reattivo: prop esplicita > nota corrente > fallback.
   const displayTitle = noteTitle ?? currentNote?.title ?? 'Nota senza titolo'
 
-  const openModal = (modal: 'summarize' | 'generate') => {
+  const openModal = (modal: AiActionId) => {
     useEditorStore.setState({
       streamedOutput: '',
       errorMessage: null,
       aiModal: modal,
     })
   }
-  const onSummarize = () => openModal('summarize')
-  const onGenerate = () => openModal('generate')
 
   return (
     <header className="flex flex-col gap-2 border-b border-border bg-background px-4 py-3">
@@ -74,53 +59,43 @@ export function TopBar({ noteTitle }: TopBarProps) {
 
       {/* Riga azioni AI, sotto il titolo. */}
       <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={onGenerate}
-            disabled={isGenerating}
-            aria-disabled={isGenerating}
-            aria-label="Genera"
-          >
-            <Sparkles aria-hidden="true" />
-            Genera
-          </Button>
+          <Button type="button" size="sm" variant="secondary"
+          onClick={() => openModal('generate')} disabled={isGenerating} aria-label="Genera">
+          <Sparkles aria-hidden="true" /> Genera
+        </Button>
 
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={onSummarize}
-            disabled={isGenerating}
-            aria-disabled={isGenerating}
-            aria-label="Riassumi"
-          >
-            <FileText aria-hidden="true" />
-            Riassumi
-          </Button>
+        <Button type="button" size="sm" variant="secondary"
+          onClick={() => openModal('summarize')} disabled={isGenerating} aria-label="Riassumi">
+          <FileText aria-hidden="true" /> Riassumi
+        </Button>
 
-          {disabledActions.map(({ label, icon }) => (
-            <Button
-              key={label}
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled
-              aria-disabled="true"
-              title={`${label} (non disponibile)`}
-            >
-              {icon}
-              {label}
-            </Button>
-          ))}
+        <Button type="button" size="sm" variant="secondary"
+          onClick={() => openModal('rewrite')} disabled={isGenerating} aria-label="Riscrivi">
+          <Wand2 aria-hidden="true" /> Riscrivi
+        </Button>
+
+        <Button type="button" size="sm" variant="secondary"
+          onClick={() => openModal('translate')} disabled={isGenerating} aria-label="Traduci">
+          <Languages aria-hidden="true" /> Traduci
+        </Button>
+
+        <Button type="button" size="sm" variant="secondary"
+          onClick={() => openModal('grammar')} disabled={isGenerating} aria-label="Grammatica">
+          <SpellCheck aria-hidden="true" /> Grammatica
+        </Button>
+
+        <Button type="button" size="sm" variant="secondary"
+          onClick={() => openModal('critique')} disabled={isGenerating} aria-label="Analisi">
+          <Brain aria-hidden="true" /> Analisi
+        </Button>
+
 
           {showStreamingUi && (
             <Button
               type="button"
               variant="destructive"
               size="sm"
-              onClick={abort}
+              onClick={handleAbort}
               aria-label="Interrompi generazione in corso"
             >
               Interrompi

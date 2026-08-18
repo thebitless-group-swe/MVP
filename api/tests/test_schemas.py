@@ -1,20 +1,15 @@
-"""Test di validazione per i Pydantic schemas dell'API.
-
-Verifica i vincoli di TextRequest in linea con il contratto
-POST /api/summarize e con UC 63 (gestione testo insufficiente)
-dell'analisi dei requisiti.
-"""
+"""Test di validazione per i Pydantic schemas dell'API."""
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import TextRequest
+from app.api.schemas import TextRequest
 
 
 class TestTextRequest:
     """Verifica i vincoli di validazione di TextRequest.
 
     Contratto API POST /api/summarize:
-    - text: stringa, minimo 10 caratteri (UC 63)
+    - text: stringa, minimo 10 caratteri (UC73)
     """
 
     def test_valido_con_testo_sufficiente(self):
@@ -33,7 +28,6 @@ class TestTextRequest:
         assert errors[0]["type"] == "missing"
 
     def test_solleva_validation_error_su_stringa_vuota(self):
-        """Stringa vuota viola il vincolo min_length=10."""
         with pytest.raises(ValidationError) as exc_info:
             TextRequest(text="")
 
@@ -42,7 +36,6 @@ class TestTextRequest:
         assert errors[0]["loc"] == ("text",)
 
     def test_solleva_validation_error_su_testo_troppo_corto(self):
-        """Testo < 10 caratteri viola min_length (UC 63)."""
         with pytest.raises(ValidationError) as exc_info:
             TextRequest(text="ciao")  # 4 caratteri
 

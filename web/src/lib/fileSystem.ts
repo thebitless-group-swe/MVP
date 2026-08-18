@@ -1,4 +1,4 @@
-// lib/fileSystem.ts
+import { newId } from './id'
 
 export interface Note {
   id: string
@@ -8,13 +8,69 @@ export interface Note {
   updatedAt: number
 }
 
+// Vedi scegliFileConInput.
+export const GRAZIA_ANNULLAMENTO_MS = 300
+
+/** Titolo di ripiego quando il file scelto non espone un nome utilizzabile. */
+const TITOLO_DI_RIPIEGO = 'Nota importata'
+
+/**
+ * Riconosce l'errore con cui il browser segnala «l'utente ha annullato».
+ *
+ * Si controlla il name e non `instanceof`, che salta fra i realm del browser.
+ */
+function eAnnullamento(err: unknown): boolean {
+  return err != null && (err as { name?: string }).name === 'AbortError'
+}
+
+/**
+ * Ramo di fallback per i browser senza File System Access API.
+ *
+ * Non e' un caso limite, R-1-V-Ob impone anche Firefox che quell'API non ce
+ * l'ha. Torna `null` per l'annullamento e non la stringa vuota, che non
+ * distinguerebbe «annullato» da «file vuoto» (un .md vuoto e' valido).
+ */
+function scegliFileConInput(): Promise<{ text: string; fileName: string } | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.md,.txt'
+
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return resolve(null)
+      const reader = new FileReader()
+      reader.onload = () =>
+        resolve({ text: (reader.result as string) ?? '', fileName: file.name })
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(file)
+    }
+
+    input.oncancel = () => resolve(null)
+
+    // Seconda via d'uscita: `oncancel` non lo emettono tutti i browser, e dove
+    // manca questa Promise resterebbe pendente per sempre. Il margine serve
+    // perche' `change` arriva subito dopo il focus quando una scelta c'e'.
+    window.addEventListener(
+      'focus',
+      () => {
+        setTimeout(() => {
+          if (!input.files?.length) resolve(null)
+        }, GRAZIA_ANNULLAMENTO_MS)
+      },
+      { once: true },
+    )
+
+    input.click()
+  })
+}
+
 /** Apre una nota leggendo un file dal filesystem (File System Access API con fallback input) */
 export async function openNoteFromFile(): Promise<Note | null> {
   let text: string
   let fileName: string
 
   if ('showOpenFilePicker' in window) {
-    // File System Access API (Chrome/Edge)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const [fileHandle] = await (window as any).showOpenFilePicker({
@@ -30,38 +86,21 @@ export async function openNoteFromFile(): Promise<Note | null> {
       text = await file.text()
       fileName = file.name
     } catch (err: unknown) {
-      // L'utente ha annullato il picker
-      if (err instanceof Error && err.name === 'AbortError') return null
+      if (eAnnullamento(err)) return null
       throw err
     }
   } else {
-    // Fallback: <input type="file">
-    text = await new Promise((resolve, reject) => {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = '.md,.txt'
-      input.onchange = () => {
-        const file = input.files?.[0]
-        if (!file) return resolve('')
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = () => reject(reader.error)
-        reader.readAsText(file)
-      }
-      input.oncancel = () => resolve('')
-      input.click()
-    })
-    fileName = ''
-    if (!text) return null
+    const scelta = await scegliFileConInput()
+    if (!scelta) return null
+    text = scelta.text
+    fileName = scelta.fileName
   }
 
   const now = Date.now()
-  const title = fileName
-    ? fileName.replace(/\.(md|txt)$/i, '')
-    : 'Imported note'
+  const title = fileName ? fileName.replace(/\.(md|txt)$/i, '') : TITOLO_DI_RIPIEGO
 
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     title,
     content: text,
     createdAt: now,
@@ -69,7 +108,6 @@ export async function openNoteFromFile(): Promise<Note | null> {
   }
 }
 
-/** Salva una nota su file (stub — implementato in FS-02) */
 /** Salva una nota su file (showSaveFilePicker con fallback download) */
 export async function saveNoteToFile(note: Note): Promise<void> {
   const fileName = `${note.title || 'nota'}.md`
@@ -91,11 +129,14 @@ export async function saveNoteToFile(note: Note): Promise<void> {
       await writable.write(blob)
       await writable.close()
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return
+      if (eAnnullamento(err)) return
       throw err
     }
   } else {
-    // Fallback: download automatico
+    // PUNTO APERTO (issue #32), da provare su Firefox vero. L'ancora non e' inserita nel
+    // documento e revokeObjectURL parte subito dopo il click mentre il download
+    // e' asincrono: due pattern fragili proprio sul browser per cui questo ramo
+    // esiste. In jsdom non si vede.
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

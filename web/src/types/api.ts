@@ -4,7 +4,41 @@
  */
 
 export interface paths {
-    "/api/summarize": {
+    "/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health */
+        get: operations["health__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/constants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Constants */
+        get: operations["constants_api_constants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/critique": {
         parameters: {
             query?: never;
             header?: never;
@@ -13,8 +47,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Summarize */
-        post: operations["summarize_api_summarize_post"];
+        /** Critique */
+        post: operations["critique_api_critique_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -55,17 +89,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/": {
+    "/api/grammar": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Health */
-        get: operations["health__get"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** Grammar */
+        post: operations["grammar_api_grammar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rewrite */
+        post: operations["rewrite_api_rewrite_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/summarize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Summarize */
+        post: operations["summarize_api_summarize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate */
+        post: operations["translate_api_translate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -76,56 +161,120 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ApiConstants
+         * @description Costanti del contratto lette dal frontend tramite openapi-typescript.
+         *
+         *     Il campo e' tipizzato come letterale, quindi in /openapi.json compare come
+         *     `const`.
+         */
+        ApiConstants: {
+            /**
+             * Max Prompt Length
+             * @default 2000
+             * @constant
+             */
+            max_prompt_length: 2000;
+            /**
+             * Max Text Length
+             * @default 12000
+             * @constant
+             */
+            max_text_length: 12000;
+            /**
+             * Min Prompt Length
+             * @default 3
+             * @constant
+             */
+            min_prompt_length: 3;
+            /**
+             * Min Text Length
+             * @default 10
+             * @constant
+             */
+            min_text_length: 10;
+            /**
+             * No Errors Marker
+             * @default NESSUN_ERRORE_RILEVATO
+             * @constant
+             */
+            no_errors_marker: "NESSUN_ERRORE_RILEVATO";
+        };
+        /** CritiqueRequest */
+        CritiqueRequest: {
+            /**
+             * Hat
+             * @enum {string}
+             */
+            hat: "bianco" | "rosso" | "giallo" | "nero" | "verde" | "blu";
+            /** Text */
+            text: string;
+        };
+        /** ErrorResponse */
+        ErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
         /** GenerateRequest */
         GenerateRequest: {
-            /** Prompt */
-            prompt: string;
             /**
              * Length
              * @default medio
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+            /** Prompt */
+            prompt: string;
         };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
+        /** GrammarRequest */
+        GrammarRequest: {
+            /** Text */
+            text: string;
         };
         /** LinkRequest */
         LinkRequest: {
-            /** Url */
-            url: string;
             /**
              * Length
              * @default medio
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+        };
+        /** RewriteRequest */
+        RewriteRequest: {
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "formale" | "informale" | "accademico";
+            /** Text */
+            text: string;
         };
         /** TextRequest */
         TextRequest: {
-            /** Text */
-            text: string;
             /**
              * Length
              * @default medio
              * @enum {string}
              */
             length: "breve" | "medio" | "dettagliato";
+            /** Text */
+            text: string;
         };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
+        /** TranslateRequest */
+        TranslateRequest: {
+            /**
+             * Target Language
+             * @enum {string}
+             */
+            target_language: "inglese" | "francese" | "tedesco" | "spagnolo";
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -136,7 +285,49 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    summarize_api_summarize_post: {
+    health__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    constants_api_constants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiConstants"];
+                };
+            };
+        };
+    };
+    critique_api_critique_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -145,7 +336,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TextRequest"];
+                "application/json": components["schemas"]["CritiqueRequest"];
             };
         };
         responses: {
@@ -158,13 +349,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -191,13 +382,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -224,25 +415,29 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
     };
-    health__get: {
+    grammar_api_grammar_post: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrammarRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -250,9 +445,115 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rewrite_api_rewrite_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RewriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    summarize_api_summarize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    translate_api_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

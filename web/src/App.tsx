@@ -1,12 +1,11 @@
 import { Editor } from '@/components/Editor'
 import { EditorToolbar } from '@/components/EditorToolbar'
-import { GenerateModal } from '@/components/GenerateModal'
 import { Preview } from '@/components/Preview'
 import { Sidebar } from '@/components/Sidebar'
-import { SummarizeModal } from '@/components/SummarizeModal'
 import { TopBar } from '@/components/TopBar'
 import { ViewToggle } from '@/components/ViewToggle'
 import { useViewMode } from '@/store/useEditorStore'
+import { AiActionDialog } from '@/components/AiActionDialog'
 
 export default function App() {
   const viewMode = useViewMode()
@@ -20,20 +19,12 @@ export default function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
 
-        {/*
-          Barra dedicata alla vista (Editor / Split / Render): separata dalle
-          azioni AI della TopBar e sempre visibile in ogni modalità, così è
-          possibile tornare a Editor/Split anche da "render".
-        */}
+        {/* Sta fuori dalla TopBar e resta visibile in ogni modalita', altrimenti
+            da "render" non si tornerebbe piu' indietro. */}
         <div className="flex items-center justify-end border-b border-border bg-background px-4 py-2">
           <ViewToggle />
         </div>
 
-        {/*
-          Layout in base alla vista selezionata (ViewToggle nella TopBar):
-          - split:        griglia responsive Editor | Preview
-          - editor/render: pannello singolo a tutta larghezza
-        */}
         <main
           className={
             viewMode === 'split'
@@ -70,8 +61,7 @@ export default function App() {
         </main>
       </div>
 
-      <SummarizeModal />
-      <GenerateModal />
+      <AiActionDialog />
     </div>
   )
 }
