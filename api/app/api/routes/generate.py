@@ -20,7 +20,5 @@ async def generate(
     request: Request,
     client: LLMClient = Depends(get_llm_client),
 ) -> StreamingResponse:
-    #Alias sull'import: il caso d'uso si chiama come questo handler, e il nome
-    #dell'handler non puo' cambiare perche' FastAPI ci deriva l'operationId.
     chunks = generate_service(payload.prompt, payload.length, client)
     return await sse_response(request, chunks, "generazione", logger)

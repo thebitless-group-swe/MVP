@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@fontsource-variable/geist";
+/* Serve: l'import qui sopra porta solo le face dritte, e senza queste <em>
+ * viene reso identico al testo normale perche' font-synthesis: none vieta al
+ * browser di inclinarlo da se'. */
+@import "@fontsource-variable/geist/wght-italic.css";
 
 @plugin "@tailwindcss/typography";
 
@@ -131,35 +135,14 @@
   }
 }
 
-/* ── CSS custom Edoardo (scaffolding #5) ─────────────────────────────────
- * Tipografia di base (dimensioni, interlinea, rendering del testo), stili
- * degli elementi non componentizzati (h1, h2, code) e il bordo laterale di
- * #root.
- *
- * Non ridichiarare qui i token shadcn. Questo blocco viene dopo e ha la
- * stessa specificita' di quello in cima al file, quindi vincerebbe: e' cosi'
- * che --border e --accent sono rimasti a lungo bloccati sui vecchi valori
- * esadecimali. Vale anche per la shorthand `font`, che azzererebbe la
- * font-family ereditata da --font-sans.
- *
- * La palette legacy (--text, --text-h, --bg, --code-bg) resta invece in uso
- * qui sotto per h1/h2/code e per lo sfondo di :root, e segue
- * prefers-color-scheme, non la classe .dark dei token shadcn.
- * ─────────────────────────────────────────────────────────────────────── */
+/* Non ridichiarate qui i token shadcn: questo blocco viene dopo e a parita' di
+ * specificita' vincerebbe. La palette legacy qui sotto segue
+ * prefers-color-scheme e non la classe .dark, quindi usatela il meno possibile
+ * (restano solo --text, --bg e --mono, le altre erano morte e sono via). */
 
 :root {
   --text: #6b6375;
-  --text-h: #08060d;
   --bg: #fff;
-  --code-bg: #f4f3ec;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: var(--font-sans);
   --mono: ui-monospace, Consolas, monospace;
 
   /* Non usare la shorthand `font`: resetterebbe anche font-family,
@@ -183,18 +166,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;
-    --text-h: #f3f4f6;
     --bg: #16171d;
-    --code-bg: #1f2028;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
   }
 }
 
@@ -214,31 +186,10 @@ body {
   margin: 0;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
+/* NON rivestite h1/h2/code con la palette legacy: segue prefers-color-scheme
+ * mentre il resto segue .dark, e col SO in dark i titoli finivano bianchi su
+ * bianco. Li veste `prose`, che usa gli stessi token di tutto il resto. */
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
 p {
   margin: 0;
 }
@@ -248,14 +199,21 @@ code,
   font-family: var(--mono);
   display: inline-flex;
   border-radius: 4px;
-  color: var(--text-h);
+  color: var(--foreground);
 }
 
 code {
   font-size: 15px;
   line-height: 135%;
   padding: 4px 8px;
-  background: var(--code-bg);
+  background: var(--muted);
+}
+
+/* `prose` mette i backtick attorno al codice inline con ::before/::after.
+ * Nell'anteprima non li vogliamo, la sintassi Markdown sta nell'editor. */
+.prose code::before,
+.prose code::after {
+  content: none;
 }
 
 /* ── Typewriter cursor (V4) ──────────────────────────────────────────── */

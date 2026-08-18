@@ -1,32 +1,4 @@
-"""Rete di sicurezza per la riscrittura dei prompt come composizione di regole.
-
-Serve a un lavoro preciso: le regole di prompting sono oggi ripetute parola per
-parola in tutti e tredici i system prompt — «preamboli» compare 11 volte,
-«meta-commenti» 11, «in italiano» 10 — e stanno per essere estratte in costanti
-nominate e ricomposte da una funzione sola.
-
-**La caratterizzazione non puo' essere per byte, e va detto invece che
-aggirato.** I prompt attuali sono triple-quoted string indentate: ogni riga del
-testo porta quattro spazi che la composizione normalizza. Un confronto esatto
-fallirebbe per una differenza che non e' un difetto, e per evitarlo si
-finirebbe a riprodurre l'indentazione nella funzione di composizione — cioe' a
-scrivere il codice nuovo in funzione del test invece che del problema.
-
-Qui si fissa percio' cio' che deve sopravvivere alla riscrittura, non la forma
-in cui e' scritto oggi:
-
-  - la struttura del risultato (due messaggi, ruoli, testo utente intatto e non
-    ripetuto nel system prompt);
-  - la presenza di ogni regola che il singolo prompt dichiara — e' la rete che
-    intercetta una regola persa per strada nel passaggio a costanti condivise;
-  - la distinzione fra i prompt: dodici operazioni, dodici testi diversi. E' il
-    test che si accorge di una composizione che collassa due prompt sulle
-    stesse regole, l'errore piu' probabile quando si condividono le costanti.
-
-Le tre proprieta' sono verificate su tutte e tredici le varianti insieme, non
-sul solo riassunto: la duplicazione da eliminare e' proprio cio' che le tiene
-oggi tutte uguali fra loro.
-"""
+"""Rete di sicurezza per la riscrittura dei prompt come composizione di regole."""
 from collections.abc import Callable
 from typing import get_args
 
@@ -179,14 +151,7 @@ def test_ogni_prompt_dichiara_le_proprie_regole(
 
 
 def test_le_dodici_operazioni_hanno_dodici_prompt_distinti() -> None:
-    """Condividere le regole non deve rendere due operazioni indistinguibili.
-
-    Dodici e non tredici: la critica ha un prompt per cappello e conta sei
-    volte, le altre sei operazioni una ciascuna. E' l'invariante piu' esposta
-    dalla riscrittura — due operazioni che condividono quasi tutte le regole
-    collassano sullo stesso testo appena una di quelle proprie viene
-    dimenticata.
-    """
+    """Condividere le regole non deve rendere due operazioni indistinguibili."""
     canonici = {
         "summarize": build_summarize_messages(TESTO, "medio"),
         "generate": build_generate_messages(TESTO, "medio"),
@@ -220,12 +185,7 @@ def test_il_parametro_cambia_il_prompt(
     build: Callable[[str, str], list[Message]],
     valori: tuple[str, ...],
 ) -> None:
-    """Un parametro ignorato produrrebbe lo stesso prompt per valori diversi.
-
-    E' il difetto che passa piu' facilmente inosservato spostando le istruzioni
-    in un dizionario di costanti: la chiave viene letta, il valore non viene
-    interpolato, e il prompt resta valido — solo, non dice piu' cosa fare.
-    """
+    """Un parametro ignorato produrrebbe lo stesso prompt per valori diversi."""
     prodotti = {valore: _system(build(TESTO, valore)) for valore in valori}
 
     assert len(set(prodotti.values())) == len(valori)

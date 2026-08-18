@@ -30,7 +30,9 @@ class SpyLLMClient(LLMClient):
     def __init__(self) -> None:
         self.calls = 0
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         self.calls += 1
         yield "chunk"
 
@@ -114,21 +116,18 @@ class TestSchemaValidation:
 
 
 class TestInvalidPayloadNeverReachesProvider:
-    """Su 422 di schema il provider non viene chiamato (UC 63)."""
+    """Su 422 di schema il provider non viene chiamato (UC73)."""
 
     @pytest.mark.parametrize(
         ("path", "payload"),
         [
-            #Valore fuori enum
             ("/api/translate", {"text": VALID_TEXT, "target_language": "klingon"}),
             ("/api/rewrite", {"text": VALID_TEXT, "style": "barocco"}),
             ("/api/critique", {"text": VALID_TEXT, "hat": "arcobaleno"}),
-            #Testo sotto la soglia minima
             ("/api/translate", {"text": SHORT_TEXT, "target_language": "inglese"}),
             ("/api/rewrite", {"text": SHORT_TEXT, "style": "formale"}),
             ("/api/grammar", {"text": SHORT_TEXT}),
             ("/api/critique", {"text": SHORT_TEXT, "hat": "nero"}),
-            #Campo obbligatorio assente
             ("/api/translate", {"text": VALID_TEXT}),
             ("/api/rewrite", {"text": VALID_TEXT}),
             ("/api/critique", {"text": VALID_TEXT}),

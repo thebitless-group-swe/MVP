@@ -6,8 +6,8 @@ const UNDERLINE_PATTERN = /\+\+([^+]+)\+\+/g
 /**
  * Trasforma `++testo++` in un nodo reso come `<u>`.
  *
- * Il tag è dichiarato con `data.hName`, quindi la pipeline non ha bisogno di
- * abilitare l'HTML raw.
+ * Il tag si dichiara con `data.hName`, cosi' non serve abilitare l'HTML raw
+ * nella pipeline.
  */
 export function remarkUnderline() {
   return (tree: Root) => {

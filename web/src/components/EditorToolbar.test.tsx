@@ -16,7 +16,6 @@ vi.mock('@/lib/editorCommands', async (importOriginal) => ({
   ...editorCommands,
 }))
 
-// I comandi sono mockati: alla toolbar basta che editorView sia presente.
 const fakeView = {} as never
 
 describe('EditorToolbar', () => {
@@ -30,6 +29,15 @@ describe('EditorToolbar', () => {
 
     expect(screen.getByRole('button', { name: 'Sottolineato' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Barrato' })).toBeInTheDocument()
+  })
+
+  // Il salvataggio vive nella sidebar (R-88-F-Ob/UC78.1, errori R-90-F-Ob/UC79).
+  // Qui c'era un «Salva» senza onClick: se qualcuno lo rimette deve collegarlo
+  // e dare al suo errore un posto visibile con la sidebar chiusa.
+  it('non offre un comando di salvataggio: quello vive nella sidebar', () => {
+    render(<EditorToolbar />)
+
+    expect(screen.queryByRole('button', { name: /salva/i })).not.toBeInTheDocument()
   })
 
   it('il pulsante Sottolineato invoca toggleUnderlineCommand', async () => {

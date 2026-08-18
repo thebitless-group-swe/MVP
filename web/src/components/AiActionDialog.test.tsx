@@ -12,17 +12,12 @@ import {
 } from '@/types/models'
 import { AI_ACTIONS } from '@/lib/aiActions'
 
-// Hoisted: i mock devono essere pronti prima che vi.mock li usi
 const { mockStart, mockAbort, capturedFn } = vi.hoisted(() => ({
   mockStart: vi.fn().mockImplementation(async (fn) => {
-    // Salva la funzione per poterla ispezionare dopo
     capturedFn.value = fn
   }),
-  //Doppio fedele di `abort()`: annulla il controller in corso, lo sgancia e
-  //spegne l'indicatore di attesa — cio' che il vero hook fa, osservato da
-  //fuori. Un doppio inerte faceva passare il test dell'Interrompi solo perche'
-  //il componente chiamava `finishStreaming()` una seconda volta: il doppio
-  //mentiva, e il codice di produzione pagava il conto con una riga ridondante.
+  //Doppio fedele di abort(), uno inerte faceva passare il test dell'Interrompi
+  //solo perche' il componente chiamava finishStreaming() due volte.
   mockAbort: vi.fn(() => {
     const stato = useEditorStore.getState()
     stato._abortController?.abort()
@@ -34,17 +29,14 @@ const { mockStart, mockAbort, capturedFn } = vi.hoisted(() => ({
   },
 }))
 
-// Mock di useAiStream con la nuova firma
 vi.mock('@/hooks/useAiStream', () => ({
   useAiStream: () => ({ start: mockStart, abort: mockAbort, status: 'idle' }),
 }))
 
-// Mock di useTypewriter
 vi.mock('@/hooks/useTypewriter', () => ({
   useTypewriter: (text: string) => text,
 }))
 
-// Mock di aiActions: getActiveText restituisce un testo lungo
 vi.mock('@/lib/aiActions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/aiActions')>()
   return { ...actual, getActiveText: vi.fn(() => ACTIVE_TEXT) }
@@ -52,7 +44,6 @@ vi.mock('@/lib/aiActions', async (importOriginal) => {
 
 import { getActiveText } from '@/lib/aiActions'
 
-// Mock della Facade api
 vi.mock('@/lib/api', () => ({
   api: {
     summarize: vi.fn().mockImplementation(() => (async function* () { yield 'chunk' })()),
@@ -70,7 +61,6 @@ const ACTIVE_TEXT = 'testo di esempio abbastanza lungo per il test'
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getActiveText).mockReturnValue(ACTIVE_TEXT)
-  // Reset captured function
   capturedFn.value = null
   useEditorStore.setState({
     currentText: 'testo originale',
@@ -110,12 +100,10 @@ describe('AiActionDialog — body corretto', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /genera/i }))
 
-    // Verifica che start sia chiamato con una funzione
     expect(mockStart).toHaveBeenCalledTimes(1)
     const fn = mockStart.mock.calls[0][0]
     expect(fn).toBeInstanceOf(Function)
 
-    // Esegui la funzione per verificare che chiami la Facade corretta
     await fn(new AbortController().signal)
     expect(api.summarize).toHaveBeenCalledWith(ACTIVE_TEXT, 'medio', expect.any(AbortSignal))
   })
@@ -471,5 +459,167 @@ describe('AiActionDialog — chiusura durante la generazione (UC71)', () => {
     expect(controller.signal.aborted).toBe(true)
     expect(useEditorStore.getState().isGenerating).toBe(false)
     expect(useEditorStore.getState().aiModal).toBeNull()
+  })
+})
+
+describe('AiActionDialog — l anteprima non sopravvive al cambio di richiesta', () => {
+  it('passando da «Da prompt» a «Da link» l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'generate',
+        streamedOutput: 'testo generato dal prompt di prima',
+        isGenerating: false,
+      })
+    })
+    render(<AiActionDialog />)
+
+    expect(screen.getByLabelText('Anteprima output')).toHaveTextContent(
+      'testo generato dal prompt di prima',
+    )
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+    expect(screen.getByLabelText('Anteprima output').textContent).toBe('')
+  })
+
+  it('tornando da «Da link» a «Da prompt» l anteprima si svuota', async () => {
+    act(() => { useEditorStore.getState().setAiModal('generate') })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da link' }))
+    act(() => {
+      useEditorStore.setState({ streamedOutput: 'testo generato dal link' })
+    })
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da prompt' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('cambiando lingua di destinazione l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        streamedOutput: 'The winter sea is a concept the mind does not consider.',
+        isGenerating: false,
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Spagnolo' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+    expect(screen.getByLabelText('Anteprima output').textContent).toBe('')
+  })
+
+  it('cambiando stile di riscrittura l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'rewrite',
+        streamedOutput: 'riscrittura formale di prima',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Accademico' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('cambiando cappello l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'critique',
+        streamedOutput: 'analisi del cappello bianco',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: /critico/i }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('cambiando lunghezza l anteprima si svuota', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'summarize',
+        streamedOutput: 'riassunto medio di prima',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Breve' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('l errore della richiesta precedente sparisce con essa', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        errorMessage: 'Servizio temporaneamente non disponibile',
+      })
+    })
+    render(<AiActionDialog />)
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Tedesco' }))
+
+    expect(useEditorStore.getState().errorMessage).toBeNull()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('cambiare parametro durante la generazione annulla la richiesta in corso', async () => {
+    const controller = new AbortController()
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        isGenerating: true,
+        _abortController: controller,
+        streamedOutput: 'The winter sea',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Spagnolo' }))
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+})
+
+describe('AiActionDialog — ri-cliccare la scelta gia attiva non azzera nulla', () => {
+  it('ri-cliccare la lingua gia selezionata lascia l anteprima al suo posto', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'translate',
+        streamedOutput: 'The winter sea is a concept the mind does not consider.',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Inglese' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe(
+      'The winter sea is a concept the mind does not consider.',
+    )
+  })
+
+  it('ri-cliccare la tab gia attiva lascia l anteprima al suo posto', async () => {
+    act(() => {
+      useEditorStore.setState({
+        aiModal: 'generate',
+        streamedOutput: 'testo generato dal prompt',
+      })
+    })
+    render(<AiActionDialog />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Da prompt' }))
+
+    expect(useEditorStore.getState().streamedOutput).toBe('testo generato dal prompt')
   })
 })

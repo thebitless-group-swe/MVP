@@ -10,7 +10,6 @@ import {
   Link,
   List,
   ListOrdered,
-  Save,
   Strikethrough,
   Type,
   Underline,
@@ -195,18 +194,6 @@ export function EditorToolbar() {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
-      </div>
-
-      <div className="ml-auto flex items-center gap-1">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          aria-label="Salva nota"
-        >
-          <Save aria-hidden="true" />
-          Salva
-        </Button>
       </div>
     </div>
   )

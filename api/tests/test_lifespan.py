@@ -1,16 +1,4 @@
-"""Test del lifespan: rilascio delle risorse allo shutdown dell'applicazione.
-
-File dedicato, e non un'aggiunta a test_health.py, per una ragione che non e' di
-stile: questi sono i primi test del repository a scrivere `with TestClient(app)`,
-cioe' gli unici che eseguono davvero il lifespan. Sono percio' esattamente quelli
-che una futura validazione delle chiavi al boot farebbe fallire. Tenerli in un
-file solo confina il raggio di quella modifica, invece di spargerlo sulla fixture
-`client` condivisa da tutta la suite.
-
-Diversi test leggono `_client`, l'attributo privato dell'adattatore. E' il
-precedente gia' adottato in test_tavily_extractor.py: la risorsa da chiudere e'
-incapsulata per costruzione, e verificarne la chiusura richiede di guardarci.
-"""
+"""Test del lifespan: rilascio delle risorse allo shutdown dell'applicazione."""
 
 import logging
 from collections.abc import Iterator
@@ -42,14 +30,7 @@ class TestIlLifespanGiraSoloConIlContextManager:
     """L'invariante su cui poggia il resto della suite."""
 
     def test_senza_context_manager_il_lifespan_non_gira(self) -> None:
-        """`conftest.client` usa `TestClient(app)` nudo, e nessun altro test usa `with`.
-
-        Se il lifespan girasse comunque, ogni test della suite uscirebbe
-        chiudendo il client LLM condiviso. Fissare qui l'invariante fa si' che
-        un cambio di comportamento di Starlette si scopra in questo punto,
-        invece che come una manciata di fallimenti sparsi e senza causa
-        evidente altrove.
-        """
+        """`conftest.client` usa `TestClient(app)` nudo, e nessun altro test usa `with`."""
         llm = get_llm_client()
 
         nudo = TestClient(app)
@@ -79,12 +60,7 @@ class TestChiusuraDelClientLLM:
         assert invocazioni == ["aclose"]
 
     def test_dopo_lo_shutdown_il_client_httpx_e_davvero_chiuso(self) -> None:
-        """Asserisce l'effetto, non la chiamata.
-
-        Il test precedente verifica che il lifespan passi per `aclose`; questo
-        che `aclose` faccia qualcosa. Un `aclose` svuotato passerebbe quello e
-        fallirebbe questo: servono entrambi.
-        """
+        """Asserisce l'effetto, non la chiamata."""
         llm = get_llm_client()
 
         with TestClient(app) as attivo:
@@ -98,14 +74,7 @@ class TestChiusuraDellAdattatoreTavily:
     def test_senza_chiave_lo_shutdown_non_solleva(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """La trappola che `close_content_extractor` esiste per evitare.
-
-        Chiamare `get_content_extractor()` allo shutdown avrebbe sollevato
-        `HTTPException(503)` in ogni ambiente senza chiave — i test per primi.
-        Nessuna richiesta HTTP attraversa questo percorso, quindi senza un test
-        dedicato il difetto si manifesterebbe solo alla chiusura di un processo
-        reale, cioe' dove nessuno lo sta guardando.
-        """
+        """La trappola che `close_content_extractor` esiste per evitare."""
         monkeypatch.setenv("TAVILY_API_KEY", "")
         get_settings.cache_clear()
 
@@ -118,18 +87,7 @@ class TestChiusuraDellAdattatoreTavily:
     def test_con_la_chiave_lo_shutdown_chiude_l_adattatore(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Qui si asserisce la chiamata, e va detto perche' non l'effetto.
-
-        `httpx.AsyncClient` espone `is_closed`, quindi per l'LLM l'effetto e'
-        osservabile e il test qui sopra lo sfrutta. `requests.Session` non ha un
-        equivalente: verificato che dopo `close()` non resta alcuno stato
-        pubblico diverso da prima — nessun `is_closed`, `adapters` invariati.
-        L'unico effetto davvero osservabile sarebbe `poolmanager.pools` svuotato,
-        che e' un interno di `urllib3` e legherebbe il test a una dipendenza
-        transitiva. Si asserisce quindi il cablaggio, dichiarandolo piu' debole
-        del suo gemello; la delega verso `TavilyClient.close` e' invece
-        verificabile con un doppio, ed e' coperta in test_tavily_extractor.py.
-        """
+        """Qui si asserisce la chiamata, e va detto perche' non l'effetto."""
         monkeypatch.setenv("TAVILY_API_KEY", "tvly-chiave-finta")
         get_settings.cache_clear()
 
@@ -161,11 +119,7 @@ class TestValidazioneDelleChiaviAlBoot:
     def test_senza_litellm_il_processo_non_parte(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Senza LITELLM_API_KEY nessuna delle sette funzioni AI puo' servire.
-
-        Un'API che accetta richieste sapendo di non poterne soddisfare nessuna
-        sta rispondendo a una domanda che non avrebbe dovuto ricevere.
-        """
+        """Senza LITELLM_API_KEY nessuna delle sette funzioni AI puo' servire."""
         monkeypatch.setenv("LITELLM_API_KEY", "")
         get_settings.cache_clear()
 
@@ -176,12 +130,7 @@ class TestValidazioneDelleChiaviAlBoot:
     def test_il_messaggio_nomina_la_variabile_mancante(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Il destinatario e' chi fa il deploy, non l'utente.
-
-        E' l'opposto di R-110-F-Ob, che vieta i dettagli tecnici nelle risposte
-        HTTP: li' il nome di una variabile d'ambiente sarebbe rumore o rischio,
-        qui e' l'unica informazione che rende l'errore azionabile.
-        """
+        """Il destinatario e' chi fa il deploy, non l'utente."""
         monkeypatch.setenv("LITELLM_API_KEY", "")
         get_settings.cache_clear()
 
@@ -194,10 +143,7 @@ class TestValidazioneDelleChiaviAlBoot:
     def test_il_fallimento_finisce_nel_log(
         self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Sollevare non basta: la DoD chiede che «il log dica quale manca».
-
-        Chi fa il deploy legge il log del container, non lo stacktrace.
-        """
+        """Sollevare non basta: la DoD chiede che «il log dica quale manca»."""
         monkeypatch.setenv("LITELLM_API_KEY", "")
         get_settings.cache_clear()
 
@@ -211,15 +157,7 @@ class TestValidazioneDelleChiaviAlBoot:
     def test_senza_tavily_il_processo_parte_lo_stesso(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """La degradazione graduale e' una decisione, e va fissata da un test.
-
-        TAVILY_API_KEY serve al solo /api/generate-from-link: la sua assenza
-        toglie un endpoint su otto, non il prodotto. Per quel caso la risposta
-        proporzionata resta il 503 per richiesta, coperto da
-        test_content_extractor_di.py. Se un domani si decidesse di renderla
-        obbligatoria, e' questa asserzione a doversi rompere — invece che la
-        scelta a cambiare in silenzio.
-        """
+        """La degradazione graduale e' una decisione, e va fissata da un test."""
         monkeypatch.setenv("TAVILY_API_KEY", "")
         get_settings.cache_clear()
 

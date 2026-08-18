@@ -1,5 +1,3 @@
-// lib/fileSystem.ts
-
 import { newId } from './id'
 
 export interface Note {
@@ -10,11 +8,7 @@ export interface Note {
   updatedAt: number
 }
 
-/**
- * Margine fra il ritorno del focus alla finestra e la conclusione che l'utente
- * abbia annullato il selettore. Serve solo alla seconda via d'uscita del ramo
- * di fallback: vedi `scegliFileConInput`.
- */
+// Vedi scegliFileConInput.
 export const GRAZIA_ANNULLAMENTO_MS = 300
 
 /** Titolo di ripiego quando il file scelto non espone un nome utilizzabile. */
@@ -23,29 +17,18 @@ const TITOLO_DI_RIPIEGO = 'Nota importata'
 /**
  * Riconosce l'errore con cui il browser segnala «l'utente ha annullato».
  *
- * Duck typing e non `instanceof Error`: `DOMException` appartiene al realm del
- * browser, e `instanceof` fallisce attraversando i confini di realm — iframe,
- * worker, e l'ambiente di test, dove rendeva questo ramo non verificabile. E'
- * anche la forma gia' adottata da `Sidebar.tsx:35,47,71`: qui c'erano due
- * convenzioni diverse per lo stesso controllo, e questa e' la piu' robusta.
+ * Si controlla il name e non `instanceof`, che salta fra i realm del browser.
  */
 function eAnnullamento(err: unknown): boolean {
   return err != null && (err as { name?: string }).name === 'AbortError'
 }
 
 /**
- * Ramo di fallback per i browser privi di File System Access API.
+ * Ramo di fallback per i browser senza File System Access API.
  *
- * Non e' un caso limite: **R-1-V-Ob impone anche Firefox**, che quell'API non
- * ce l'ha, quindi per un terzo dei browser obbligatori questo e' il percorso
- * primario e deve comportarsi come l'altro.
- *
- * Restituisce `null` per l'annullamento e `{ text, fileName }` per la scelta.
- * Il tipo di ritorno e' la correzione centrale: prima la Promise portava una
- * stringa sola, e la stringa vuota non bastava a distinguere «annullato» da
- * «file legittimamente vuoto» — un `.md` vuoto e' un file valido, e finiva
- * scartato. Portando anche `fileName` si chiude nello stesso punto la perdita
- * del titolo della nota su Firefox.
+ * Non e' un caso limite, R-1-V-Ob impone anche Firefox che quell'API non ce
+ * l'ha. Torna `null` per l'annullamento e non la stringa vuota, che non
+ * distinguerebbe «annullato» da «file vuoto» (un .md vuoto e' valido).
  */
 function scegliFileConInput(): Promise<{ text: string; fileName: string } | null> {
   return new Promise((resolve, reject) => {
@@ -65,15 +48,9 @@ function scegliFileConInput(): Promise<{ text: string; fileName: string } | null
 
     input.oncancel = () => resolve(null)
 
-    // Seconda via d'uscita. `oncancel` non e' emesso da tutti i browser: dove
-    // manca, annullare il selettore non produce alcun evento e questa Promise
-    // resterebbe pendente per sempre, lasciando l'interfaccia bloccata senza
-    // alcun segnale. Il ritorno del focus alla finestra e' l'unico appiglio
-    // disponibile in quel caso. Il margine serve perche' `change` arriva subito
-    // dopo il focus quando una scelta c'e' stata davvero; si controlla
-    // `input.files` e non un flag interno proprio perche' il browser lo popola
-    // prima di emettere `change`. Le chiamate successive a `resolve` sono
-    // inerti, quindi questa guardia non puo' sovrascrivere una scelta valida.
+    // Seconda via d'uscita: `oncancel` non lo emettono tutti i browser, e dove
+    // manca questa Promise resterebbe pendente per sempre. Il margine serve
+    // perche' `change` arriva subito dopo il focus quando una scelta c'e'.
     window.addEventListener(
       'focus',
       () => {
@@ -94,7 +71,6 @@ export async function openNoteFromFile(): Promise<Note | null> {
   let fileName: string
 
   if ('showOpenFilePicker' in window) {
-    // File System Access API (Chrome/Edge)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const [fileHandle] = await (window as any).showOpenFilePicker({
@@ -110,7 +86,6 @@ export async function openNoteFromFile(): Promise<Note | null> {
       text = await file.text()
       fileName = file.name
     } catch (err: unknown) {
-      // L'utente ha annullato il picker
       if (eAnnullamento(err)) return null
       throw err
     }
@@ -158,16 +133,10 @@ export async function saveNoteToFile(note: Note): Promise<void> {
       throw err
     }
   } else {
-    // Fallback: download automatico.
-    //
-    // ATTENZIONE — punto aperto, non verificabile in jsdom. L'ancora non viene
-    // inserita nel documento e `revokeObjectURL` e' invocato nell'istruzione
-    // successiva al click, mentre il download e' asincrono: sono due pattern
-    // storicamente fragili su Firefox, che e' proprio il browser per cui questo
-    // ramo esiste. Non sono stati modificati perche' la correzione va decisa
-    // sulla verifica in browser reale (#32, passo 4) e non su una supposizione:
-    // toccarli alla cieca significherebbe sostituire un rischio non misurato
-    // con una modifica non verificata.
+    // PUNTO APERTO (issue #32), da provare su Firefox vero. L'ancora non e' inserita nel
+    // documento e revokeObjectURL parte subito dopo il click mentre il download
+    // e' asincrono: due pattern fragili proprio sul browser per cui questo ramo
+    // esiste. In jsdom non si vede.
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

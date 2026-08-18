@@ -24,14 +24,11 @@ export function Sidebar() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [fileError, setFileError] = useState<string | null>(null)
-  // UC74.3: la creazione e' in due tempi — prima il sistema chiede il titolo,
-  // poi la nota nasce. `creating` e' la fase intermedia, che prima non esisteva.
+  // Fase intermedia della creazione in due tempi (UC74.3)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
-  // UC80.1 passo 3: anche la rimozione e' in due tempi, e questo e' quello di
-  // mezzo. Tiene l'id della nota per cui e' stata chiesta conferma, non un
-  // booleano: altrimenti aprendo la conferma su una riga resterebbe aperta
-  // anche sulle altre.
+  // Tiene l'id e non un booleano, altrimenti la conferma aperta su una riga
+  // resterebbe aperta anche sulle altre (UC80.1 passo 3)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleOpenFile() {
@@ -59,30 +56,13 @@ export function Sidebar() {
     }
   }
 
-  /**
-   * Crea una nota col titolo dato, con il percorso d'errore che R-84-F-Ob
-   * (UC75) richiede. Restituisce `false` se la creazione non e' riuscita.
-   *
-   * Era l'unica delle tre operazioni della sidebar a non averne uno: `apri` e
-   * `salva` qui sopra lo hanno gia'. Riusa lo stesso `fileError` e lo stesso
-   * `role="alert"`, deliberatamente: un secondo canale d'errore per la stessa
-   * barra sarebbe due meccanismi da mantenere per un solo comportamento.
-   *
-   * UC75 chiede di informare l'utente **e** di preservare lo stato precedente:
-   * la prima parte e' il messaggio, la seconda vale perche' `createEmpty`
-   * genera l'id prima di mutare qualsiasi cosa (vedi `store/notes.ts`).
-   *
-   * L'esito torna al chiamante invece di fermarsi qui perche' con UC74.3 la
-   * creazione e' in due tempi: e' `commitCreate` a sapere che c'e' un campo
-   * titolo aperto, e a doverlo lasciare aperto se la nota non e' nata.
-   */
+  /** Crea una nota, torna false se non c'e' riuscita (R-84-F-Ob, UC75). */
   function handleCreate(title: string): boolean {
     setFileError(null)
     try {
       createEmpty(title)
       return true
     } catch {
-      // R-110-F-Ob: causa e azione correttiva, nessun dettaglio tecnico.
       setFileError('Impossibile creare la nota. Riprova.')
       return false
     }
@@ -98,15 +78,11 @@ export function Sidebar() {
   }
 
   /**
-   * Annulla la richiesta del titolo. Non crea nulla: la nota non deve esistere
-   * se l'utente non conferma.
+   * Annulla la richiesta del titolo.
    *
-   * Non e' agganciato a `onBlur`, al contrario della rinomina qui sotto. La
-   * differenza e' voluta e viene da UC74.3, che di uscite ne prevede due —
-   * «l'utente inserisce il titolo e conferma» — mentre il blur non e' nessuna
-   * delle due: interpretarlo come conferma farebbe nascere note che nessuno ha
-   * chiesto, interpretarlo come annullamento butterebbe via in silenzio quello
-   * che l'utente ha appena scritto. Il campo resta aperto finche' non decide.
+   * NON agganciatelo a onBlur, al contrario della rinomina qui sotto. Come
+   * conferma farebbe nascere note che nessuno ha chiesto, come annullamento
+   * butterebbe via quello che l'utente ha appena scritto.
    */
   function cancelCreate() {
     setCreating(false)
@@ -114,13 +90,10 @@ export function Sidebar() {
   }
 
   /**
-   * Conferma la creazione. Il campo si chiude **solo se la nota e' nata**.
+   * Conferma la creazione, il campo si chiude solo se la nota e' nata.
    *
-   * Se `handleCreate` fallisce, `creating` resta acceso e `newTitle` intatto:
-   * l'avviso compare nella barra e il titolo appena scritto e' ancora li',
-   * pronto per un secondo tentativo. Chiudere il campo scarterebbe quello che
-   * l'utente ha digitato proprio nel momento in cui gli si chiede di riprovare,
-   * ed e' l'opposto del «preservare lo stato precedente» di UC75.
+   * Se fallisce, titolo e campo restano com'erano: chiuderlo scarterebbe quello
+   * che l'utente ha scritto proprio mentre gli si chiede di riprovare (UC75).
    */
   function commitCreate() {
     if (!handleCreate(newTitle)) return
@@ -128,20 +101,13 @@ export function Sidebar() {
     setNewTitle('')
   }
 
-  /**
-   * Elimina una nota, con il percorso d'errore che R-93-F-De (UC81) richiede.
-   *
-   * La conferma e' gia' avvenuta quando si arriva qui: UC80.1 la colloca al
-   * passo 3, prima dell'azione, e non come annullamento successivo.
-   */
+  /** Elimina una nota, la conferma e' gia' avvenuta (R-93-F-De, UC81). */
   function confirmDelete(id: string) {
     setFileError(null)
     try {
       deleteNote(id)
     } catch {
-      // R-110-F-Ob: causa e azione correttiva, nessun dettaglio tecnico.
-      // UC81 chiede anche che la nota NON risulti eliminata: se ne occupa
-      // `deleteNote`, che ripristina prima di rilanciare.
+      // Che la nota non risulti eliminata se ne occupa deleteNote (UC81)
       setFileError('Impossibile eliminare la nota. Riprova.')
     }
     setDeletingId(null)
@@ -323,13 +289,8 @@ export function Sidebar() {
                       </div>
                     </div>
                   ) : (
-                    /*
-                     * Due comandi affiancati, non annidati: il cestino non puo'
-                     * stare dentro il pulsante della nota, perche' un `button`
-                     * dentro un `button` non e' marcatura valida e le tecnologie
-                     * assistive non saprebbero quale dei due sta per essere
-                     * attivato.
-                     */
+                    /* Affiancati e non annidati, un button dentro un button
+                       non e' marcatura valida */
                     <div
                       className={cn(
                         'flex items-center rounded-md transition-colors',

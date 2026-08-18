@@ -1,25 +1,11 @@
-"""Traduzione degli errori di validazione in messaggi per l'utente.
-
-Sta in `api/` e non in `main.py` perche' e' logica del confine HTTP: conosce la
-forma degli errori di Pydantic e il vocabolario dei campi dei DTO, che vivono
-accanto in `schemas.py`. `main.py` resta il composition root — crea l'app,
-monta i router, registra gli handler — e non contiene piu' la traduzione.
-
-Non sta in `core/` perche' non e' dominio: un consumatore non HTTP dello stesso
-caso d'uso non ha errori di validazione Pydantic da tradurre.
-"""
+"""Traduce gli errori di validazione di Pydantic in messaggi per l'utente."""
 from .schemas import FIELD_LABELS
 
 
 def describe_validation_error(error: dict) -> str:
-    """Traduce un errore di validazione Pydantic in una frase per l'utente.
-
-    R-110-F-Ob impone causa e azione correttiva in linguaggio naturale, senza
-    dettagli tecnici. La forma di default di FastAPI viola entrambe le clausole:
-    espone `type`, `loc` e `ctx`, e rimanda indietro `input`, cioe' il testo
-    scritto dall'utente. Qui nulla di tutto cio' raggiunge la risposta.
-    """
-    #Il primo elemento di `loc` e' sempre "body": ci interessa il campo.
+    #R-110-F-Ob vuole causa e azione correttiva senza dettagli tecnici. Il
+    #formato di FastAPI espone type, loc, ctx e rimanda indietro pure il testo
+    #dell'utente, da qui non esce niente di tutto cio'.
     location = [part for part in error.get("loc", ()) if part != "body"]
     field = str(location[-1]) if location else ""
     label = FIELD_LABELS.get(field)
@@ -45,9 +31,7 @@ def describe_validation_error(error: dict) -> str:
             )
         return f"Il campo «{label}» è troppo lungo."
     if kind == "literal_error":
-        #Non elenchiamo i valori ammessi leggendoli da `ctx`: sono un dettaglio
-        #interno di Pydantic e arrivano in inglese. L'interfaccia propone
-        #esattamente le opzioni valide, quindi l'azione correttiva e' quella.
+        #I valori ammessi non si leggono da ctx, arrivano in inglese.
         return (
             f"Il valore indicato per «{label}» non è fra quelli ammessi: "
             "scegline uno fra le opzioni proposte."

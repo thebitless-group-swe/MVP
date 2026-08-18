@@ -408,3 +408,67 @@ describe('useEditorStore — abortStream (UC71 / R-109-F-De)', () => {
     expect(useEditorStore.getState().isGenerating).toBe(false)
   })
 })
+
+describe('useEditorStore — resetPreview', () => {
+  it('azzera anteprima ed errore della richiesta precedente', () => {
+    act(() => {
+      useEditorStore.setState({
+        streamedOutput: 'la traduzione in inglese di prima',
+        errorMessage: 'errore della richiesta precedente',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+    expect(useEditorStore.getState().errorMessage).toBeNull()
+  })
+
+  it('annulla la richiesta in corso prima di azzerare (UC71)', () => {
+    const controller = new AbortController()
+
+    act(() => {
+      useEditorStore.setState({
+        _abortController: controller,
+        isGenerating: true,
+        streamedOutput: 'meta della traduzione in inglese',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(controller.signal.aborted).toBe(true)
+    expect(useEditorStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState()._abortController).toBeNull()
+    expect(useEditorStore.getState().streamedOutput).toBe('')
+  })
+
+  it('non tocca il testo della nota ne la selezione', () => {
+    act(() => {
+      useEditorStore.setState({
+        currentText: 'nota intatta',
+        selectedText: 'parola',
+        streamedOutput: 'output da scartare',
+      })
+    })
+
+    act(() => {
+      useEditorStore.getState().resetPreview()
+    })
+
+    expect(useEditorStore.getState().currentText).toBe('nota intatta')
+    expect(useEditorStore.getState().selectedText).toBe('parola')
+  })
+
+  it('e innocuo quando non c e nulla da azzerare', () => {
+    expect(() => {
+      act(() => {
+        useEditorStore.getState().resetPreview()
+      })
+    }).not.toThrow()
+  })
+})

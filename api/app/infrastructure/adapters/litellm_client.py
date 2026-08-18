@@ -7,53 +7,48 @@ from ...core.domain.values import Message
 from ...core.ports.llm_client import LLMClient, LLMProviderError
 from ...settings import Settings
 
-HTTP_TIMEOUT_SECONDS = 60.0
+#read alto perche' in streaming misura la pausa fra due chunk, non tutta la
+#generazione. Tenete connect < read, c'e' un test che lo controlla.
+CONNECT_TIMEOUT_SECONDS = 10.0
+READ_TIMEOUT_SECONDS = 180.0
+WRITE_TIMEOUT_SECONDS = 30.0
+POOL_TIMEOUT_SECONDS = 10.0
+
 SSE_DATA_PREFIX = "data:"
 SSE_DONE_MARKER = "[DONE]"
 
 
 class LiteLLMClient(LLMClient):
-    """Client SSE per un gateway LiteLLM (API compatibile OpenAI).
-
-    Sta accanto a `TavilyExtractor` perche' ha lo stesso ruolo: implementare una
-    porta di `core/ports/` parlando con un servizio esterno. Finche' viveva in
-    `llm/client.py`, quel package teneva sotto lo stesso nome il dominio
-    (`prompts.py`) e l'unico modulo del backend che conosce httpx e il formato
-    SSE del provider.
-
-    Le tre costanti si spostano con la classe: descrivono il protocollo del
-    provider, non una regola di dominio. `HTTP_TIMEOUT_SECONDS` resta pubblica
-    perche' i test la usano per verificare la configurazione del trasporto.
-    """
+    """Client SSE per un gateway LiteLLM (API compatibile OpenAI)."""
 
     def __init__(self, settings: Settings) -> None:
-        #La configurazione arriva da chi costruisce l'adattatore: leggerla qui
-        #da `get_settings()` legherebbe una classe di infrastruttura al
-        #singleton globale e renderebbe impossibile istanziarla nei test senza
-        #toccare l'ambiente. Stessa scelta di `TavilyExtractor`; il composition
-        #root (`app/dependencies.py`) e' l'unico a sapere da dove arriva.
         self._settings = settings
         self._client = httpx.AsyncClient(
             base_url=settings.litellm_base_url,
-            timeout=HTTP_TIMEOUT_SECONDS,
+            timeout=httpx.Timeout(
+                connect=CONNECT_TIMEOUT_SECONDS,
+                read=READ_TIMEOUT_SECONDS,
+                write=WRITE_TIMEOUT_SECONDS,
+                pool=POOL_TIMEOUT_SECONDS,
+            ),
             headers={"Authorization": f"Bearer {settings.litellm_api_key}"},
         )
 
     async def aclose(self) -> None:
-        """Chiude il client HTTP sottostante (da invocare allo shutdown dell'app)."""
+        """Chiude il client HTTP, va invocata allo shutdown dell'app."""
         await self._client.aclose()
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
-        payload = {
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
+        payload: dict = {
             "model": self._settings.litellm_model,
-            #L'unico punto del backend in cui un messaggio prende la forma di
-            #filo del provider. Il dominio parla di `Message`; le chiavi
-            #"role" e "content" sono protocollo, e il protocollo si conosce
-            #qui. Che la traduzione stia in una riga e' il criterio con cui si
-            #verifica di non aver modellato troppo: vedi `Message`.
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": True,
         }
+        #Alcuni gateway rispondono 400 a un max_tokens messo a null.
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         try:
             async with self._client.stream(
                 "POST", "/chat/completions", json=payload
@@ -76,11 +71,9 @@ class LiteLLMClient(LLMClient):
 
     @staticmethod
     def _parse_sse_line(line: str) -> str | None:
-        """Estrae delta.content da una riga SSE OpenAI-compatibile.
+        """Estrae delta.content da una riga SSE, None se la riga va ignorata.
 
-        Ritorna None per le righe da ignorare (vuote, non-`data:`, `[DONE]`,
-        chunk senza content come quello finale con finish_reason). La stringa
-        vuota "" è un content valido e viene restituita.
+        Occhio, la stringa vuota e' un content valido e va restituita.
         """
         line = line.strip()
         if not line.startswith(SSE_DATA_PREFIX):

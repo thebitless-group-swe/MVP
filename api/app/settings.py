@@ -1,9 +1,4 @@
-"""*Cosa* e' la configurazione del processo.
-
-*Come* la si ottiene — il provider memoizzato `get_settings` — sta invece in
-`dependencies.py` insieme agli altri due (#18): i provider stanno tutti nel
-composition root, questo modulo conserva il solo schema.
-"""
+"""Schema della configurazione, il provider get_settings sta in dependencies.py."""
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

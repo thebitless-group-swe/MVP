@@ -21,14 +21,9 @@ import type { Length, Language, Style, Hat } from '@/types/models'
 import { NO_ERRORS_MARKER } from '@/types/models'
 
 
-// I `value` di queste costanti sono valori del CONTRATTO e non testo di
-// interfaccia: devono coincidere con i Literal di types/api.ts. Le `label`
-// restano invece testo di interfaccia, in italiano.
-//
-// `satisfies` al posto dell'annotazione `: T[]` e' deliberato: l'annotazione
-// allarga i letterali a `Language`/`Style`/`Hat` e permette a un cast di
-// nascondere un valore fuori contratto, che e' esattamente come «Traduci» e
-// «Riscrivi» sono arrivati a rispondere 422 a ogni click.
+// Usate `satisfies` e non l'annotazione `: T[]`, che allarga i letterali e
+// lascia passare un valore fuori contratto (Traduci e Riscrivi hanno risposto
+// 422 a ogni click per questo).
 
 const LENGTHS = [
   { value: 'breve', label: 'Breve' },
@@ -36,9 +31,7 @@ const LENGTHS = [
   { value: 'dettagliato', label: 'Dettagliato' },
 ] satisfies { value: Length; label: string }[]
 
-// R-58-F-Ob / UC63.1: quattro lingue di destinazione. L'italiano non e' fra
-// queste — tradurre in italiano un testo scritto in italiano non e' un caso
-// d'uso previsto.
+// R-58-F-Ob, UC63.1. L'italiano non c'e' apposta.
 const LANGUAGES = [
   { value: 'inglese', label: 'Inglese' },
   { value: 'francese', label: 'Francese' },
@@ -46,7 +39,7 @@ const LANGUAGES = [
   { value: 'spagnolo', label: 'Spagnolo' },
 ] satisfies { value: Language; label: string }[]
 
-// R-60-F-Ob / UC64.1: tre registri.
+// R-60-F-Ob, UC64.1.
 const STYLES = [
   { value: 'formale', label: 'Formale' },
   { value: 'informale', label: 'Informale' },
@@ -60,8 +53,7 @@ type HatDef = {
   color: string
 }
 
-// R-65 -> R-70-F-Ob: i sei cappelli. Le etichette («Informativo», «Emotivo», …)
-// sono di interfaccia; i `value` sono i nomi dei colori attesi dal contratto.
+// R-65 -> R-70-F-Ob.
 const HAT_DEFS = [
   { value: 'bianco', label: 'Informativo', description: 'Fatti, dati e informazioni oggettive', color: 'border-gray-300 bg-gray-50 text-gray-900' },
   { value: 'rosso', label: 'Emotivo', description: 'Intuizioni, emozioni e sensazioni', color: 'border-red-300 bg-red-50 text-red-900' },
@@ -114,14 +106,8 @@ type UiAction =
       return state
   }
 }
-// Esaustivita' nella direzione opposta a `satisfies`.
-//
-// `satisfies` garantisce che nessun valore dell'interfaccia sia fuori dal
-// contratto (il difetto di oggi). Queste righe garantiscono il contrario: che
-// nessun valore del contratto manchi dall'interfaccia (il difetto di domani, se
-// il backend aggiunge una lingua e il menu la omette in silenzio). Se `Exclude`
-// non collassa a `never`, il vincolo `T extends never` non e' soddisfatto e la
-// compilazione fallisce.
+// Direzione opposta a `satisfies`, impedisce che il backend aggiunga una
+// lingua e il menu la ometta in silenzio.
 type Exhaustive<T extends never> = T
 
 export type LengthsCoverContract = Exhaustive<
@@ -241,10 +227,8 @@ function HatSelector({
   )
 }
 
-// #25 — selettore di sorgente per l'azione "Genera": prompt testuale o URL.
-// Attivo solo quando actionId === 'generate'; aiModal resta sempre 'generate',
-// non commuta mai a 'generate-link' — è mode a decidere quale funzione della
-// Facade chiamare al submit (vedi handleGenerate).
+// aiModal resta sempre 'generate', e' `mode` a decidere quale funzione della
+// Facade chiamare al submit.
 function GenerateSourceTabs({
   mode,
   onChange,
@@ -348,7 +332,6 @@ export function AiActionDialog() {
 
   if (!action || !actionId) return null
 
-  // Per source 'text' l'input viene dall'editor, non da un campo UI
   const currentInput =
     action.source === 'text' ? getActiveText() : input.trim()
 
@@ -372,10 +355,23 @@ export function AiActionDialog() {
   const inputTooLong =
     effectiveMaxLength !== null && currentInput.length > effectiveMaxLength
 
+  const resetPreview = () => useEditorStore.getState().resetPreview()
+
+  // La guardia serve, PillSelector chiama onChange anche quando si ri-clicca la
+  // voce gia' attiva e senza si perde l'output cliccando due volte «Medio».
   const handleModeChange = (next: 'prompt' | 'link') => {
+    if (next === mode) return
+    resetPreview()
     dispatch({ type: 'SET_MODE', payload: next })
     dispatch({ type: 'SET_INPUT', payload: '' })
     dispatch({ type: 'SET_VALIDATION_ERROR', payload: null })
+  }
+
+  // Ci passano tutti i selettori, cosi' un sesto non si dimentica il reset.
+  const handleParamsChange = (next: AiParams) => {
+    if (JSON.stringify(next) === JSON.stringify(params)) return
+    resetPreview()
+    dispatch({ type: 'SET_PARAMS', payload: next })
   }
 
   const handleGenerate = () => {
@@ -412,8 +408,6 @@ export function AiActionDialog() {
       return
     }
 
-    //Il signal e' un parametro di ciascun ramo, non una cattura: questa stessa
-    //funzione finisce in `lastCall.execute` e viene rieseguita da «Rigenera».
     let streamFn: (signal: AbortSignal) => AsyncIterable<string>
     switch (actionId) {
       case 'summarize':
@@ -468,10 +462,6 @@ export function AiActionDialog() {
   }
 
   const handleStop = () => {
-    //`abort()` spegne gia' l'indicatore di attesa: la seconda chiamata a
-    //`finishStreaming()` che stava qui era ridondante, e mascherava il fatto
-    //che l'altro comando di annullamento — quello della TopBar — non lo
-    //spegnesse affatto.
     abort()
   }
 
@@ -569,7 +559,7 @@ export function AiActionDialog() {
             label="Lunghezza output"
             options={LENGTHS}
             value={params.length ?? 'medio'}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, length: v } })}
+            onChange={(v) => handleParamsChange({ ...params, length: v })}
           />
         )
       case 'translate':
@@ -578,7 +568,7 @@ export function AiActionDialog() {
             label="Lingua di destinazione"
             options={LANGUAGES}
             value={params.target_language ?? LANGUAGES[0].value}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, target_language: v } })}
+            onChange={(v) => handleParamsChange({ ...params, target_language: v })}
           />
         )
       case 'rewrite':
@@ -587,14 +577,14 @@ export function AiActionDialog() {
             label="Stile"
             options={STYLES}
             value={params.style ?? STYLES[0].value}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, style: v } })}
+            onChange={(v) => handleParamsChange({ ...params, style: v })}
           />
         )
       case 'critique':
         return (
           <HatSelector
             value={params.hat ?? null}
-            onChange={(v) => dispatch({ type: 'SET_PARAMS', payload: { ...params, hat: v } })}
+            onChange={(v) => handleParamsChange({ ...params, hat: v })}
           />
         )
       case 'grammar':
@@ -607,14 +597,8 @@ export function AiActionDialog() {
       open={open}
       onOpenChange={(next) => {
         if (!next) {
-          //Chiudere la modale mentre genera lasciava lo stream orfano: il
-          //provider continuava a produrre un testo che nessuno avrebbe piu'
-          //visto, perche' `TopBar.openModal` azzera `streamedOutput` alla
-          //riapertura. Non c'era quindi nulla da preservare proseguendo, e
-          //UC71 passo 3 chiede di liberare le risorse impegnate.
-          //Solo Escape e clic sull'overlay passano di qui: Accetta e Rifiuta
-          //chiudono impostando `aiModal`, che su un Dialog controllato non
-          //richiama questo callback.
+          //Qui passano solo Escape e il clic sull'overlay. Senza l'abort lo
+          //stream resta orfano e il provider continua a produrre (UC71).
           if (useEditorStore.getState().isGenerating) {
             abort()
           }

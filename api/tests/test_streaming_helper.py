@@ -85,9 +85,6 @@ async def test_chunks_are_formatted_as_sse_events() -> None:
     assert body == "data: alfa\n\ndata: beta\n\ndata: [DONE]\n\n"
 
 
-# Un chunk multiriga richiede una riga `data:` per ogni riga del contenuto: il
-# valore di un campo SSE non puo' contenere a capo. Con il formato precedente
-# le righe successive alla prima perdevano il prefisso e il client le scartava.
 async def test_multiline_chunk_becomes_one_data_line_per_line() -> None:
     stream = TrackedStream(["# Titolo\n\n- uno\n- due"])
 
@@ -104,8 +101,6 @@ async def test_multiline_chunk_becomes_one_data_line_per_line() -> None:
     )
 
 
-# Un chunk che e' solo un a capo produce due righe `data:` vuote: e' l'evento
-# che nel formato precedente spariva del tutto.
 async def test_newline_only_chunk_survives() -> None:
     stream = TrackedStream(["\n"])
 
@@ -115,9 +110,6 @@ async def test_newline_only_chunk_survives() -> None:
     assert body == "data: \ndata: \n\ndata: [DONE]\n\n"
 
 
-# Il contenuto generato dall'LLM puo' somigliare a un campo SSE. Deve viaggiare
-# come valore di `data:`, cosi' che il client -- che fa dispatch sul nome del
-# campo -- lo consegni all'utente come testo e non come errore.
 async def test_chunk_that_looks_like_an_event_field_travels_as_data() -> None:
     stream = TrackedStream(["event: error"])
 
@@ -158,9 +150,6 @@ async def test_stream_is_closed_after_normal_completion() -> None:
     assert stream.closed
 
 
-# End-to-end sulla cattura reale del gateway LiteLLM: la fixture contiene un
-# chunk che e' un solo a capo (riga 5), cioe' proprio il caso che il formato
-# precedente faceva sparire. Percorso completo LiteLLMClient -> sse_response.
 async def test_real_fixture_preserves_the_newline_chunk(sse_chunks: str) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=sse_chunks.encode())
@@ -179,21 +168,21 @@ async def test_real_fixture_preserves_the_newline_chunk(sse_chunks: str) -> None
     body = await _collect(response)
     await client.aclose()
 
-    # I chunk della fixture sono ["Ciao", " mondo", "\n"].
     assert body == (
         "data: Ciao\n\n"
         "data:  mondo\n\n"
         "data: \ndata: \n\n"
         "data: [DONE]\n\n"
     )
-    # Il terzo evento esiste e non e' scomparso, come invece accadeva prima.
     assert "data: \ndata: \n\n" in body
 
 
 class _MidStreamErrorClient(LLMClient):
     """Emette un chunk valido, poi fallisce a meta' stream."""
 
-    async def stream(self, messages: Sequence[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: Sequence[Message], max_tokens: int | None = None
+    ) -> AsyncIterator[str]:
         yield "parziale"
         raise LLMProviderError(f"Errore provider con chiave {SENTINEL_SECRET}")
 
@@ -205,12 +194,6 @@ class TestMidStreamError:
         yield
         app.dependency_overrides.clear()
 
-    #Gli header (200) sono gia' partiti quando il provider fallisce, quindi lo
-    #status non puo' cambiare: cio' che distingue il fallimento e' l'evento
-    #terminale nel corpo. Prima di #03 questo test asseriva la sola ASSENZA di
-    #[DONE], cioe' certificava come corretto un errore indistinguibile da una
-    #chiusura riuscita -- lo stesso difetto che l'analisi rimprovera altrove ai
-    #test che ratificano invece di intercettare.
     def test_mid_stream_error_emits_terminal_error_event(
         self, client: TestClient
     ) -> None:

@@ -1,12 +1,4 @@
-"""Test dei global exception handler: HTTPException e RequestValidationError.
-
-Verifica che ogni HTTPException sollevata dalle route venga mappata sullo
-schema ErrorResponse(detail: str), come definito dal contratto API:
-  POST /api/summarize -> 503 -> {"detail": "Servizio temporaneamente non disponibile"}
-
-L'handler è registrato in app.main su fastapi.HTTPException e wrappa
-exc.detail (cast a stringa) dentro ErrorResponse.model_dump().
-"""
+"""Test dei global exception handler: HTTPException e RequestValidationError."""
 from collections.abc import Iterator
 
 import pytest
@@ -47,7 +39,6 @@ def client_with_test_routes() -> Iterator[TestClient]:
 
     yield TestClient(app)
 
-    # Cleanup: rimuovi le route di test per non inquinare altre suite
     app.router.routes = [
         r
         for r in app.router.routes
@@ -79,18 +70,13 @@ class TestGlobalExceptionHandler:
     def test_detail_non_stringa_viene_castato_a_stringa(
         self, client_with_test_routes: TestClient
     ) -> None:
-        """Se detail non è stringa (es. dict), l'handler usa str() prima di serializzare.
-
-        Questo blinda la shape del contratto: response sempre {detail: <stringa>},
-        mai {detail: <oggetto>}.
-        """
+        """Se detail non è stringa, l'handler usa str() prima di serializzare."""
         response = client_with_test_routes.get("/__test__/raise-400-dict")
 
         assert response.status_code == 400
         body = response.json()
         assert "detail" in body
         assert isinstance(body["detail"], str)
-        # Il cast str(dict) produce la repr Python: "{'campo': 'errato'}"
         assert body["detail"] == "{'campo': 'errato'}"
 
     def test_content_type_application_json(
@@ -204,7 +190,6 @@ class TestValidationExceptionHandler:
     def test_messaggio_indica_causa_e_azione_correttiva(
         self, client: TestClient, path: str, payload: dict, atteso: str
     ) -> None:
-        """R-110-F-Ob: linguaggio naturale, causa e rimedio."""
         response = client.post(path, json=payload)
 
         assert response.status_code == 422
@@ -222,12 +207,7 @@ class TestValidationExceptionHandler:
     def test_detail_resta_stringa_anche_col_tipo_di_dato_sbagliato(
         self, client: TestClient, payload: dict
     ) -> None:
-        """Un tipo sbagliato non deve far ricomparire l'array di oggetti.
-
-        E' il caso che rompeva il frontend: `useAiStream` legge `detail` come
-        `string | null` e lo mette nello store. Un array la' dentro non e' un
-        messaggio piu' brutto, e' un crash in fase di render.
-        """
+        """Un tipo sbagliato non deve far ricomparire l'array di oggetti."""
         response = client.post("/api/summarize", json=payload)
 
         assert response.status_code == 422
@@ -260,12 +240,7 @@ class TestValidationExceptionHandler:
         )
 
     def test_il_contratto_dichiara_error_response_per_il_422(self) -> None:
-        """Comportamento e contratto vanno cambiati insieme.
-
-        Se lo schema restasse HTTPValidationError, openapi.json descriverebbe
-        una forma che l'applicazione non produce piu' e `pnpm types:gen`
-        genererebbe tipi sbagliati.
-        """
+        """Comportamento e contratto vanno cambiati insieme."""
         schema = app.openapi()
 
         for path in (

@@ -1,10 +1,4 @@
-"""Test della funzione che compone i prompt.
-
-Distinta da test_prompt_invariants.py, che verifica i tredici prompt del
-prodotto: qui si prova il meccanismo a vuoto, con regole finte, perche' le
-proprieta' che seguono valgono per qualunque prompt e non per quelli che oggi
-esistono.
-"""
+"""Test della funzione che compone i prompt."""
 import pytest
 
 from app.core.domain.prompts.composer import (
@@ -53,12 +47,7 @@ class TestStruttura:
         assert f"{CONTENT_HEADING}\n- PRIMA\n- SECONDA" in system
 
     def test_l_intestazione_del_contenuto_e_parametrica(self) -> None:
-        """Serve ai sei cappelli, dove quelle righe non sono regole.
-
-        Sono la prospettiva da cui guardare il testo: chiamarle «regole di
-        contenuto» renderebbe l'intestazione una bugia per sei prompt su
-        tredici.
-        """
+        """Serve ai sei cappelli, dove quelle righe non sono regole."""
         system = _system(
             compose(
                 role="RUOLO",
@@ -72,14 +61,7 @@ class TestStruttura:
         assert CONTENT_HEADING not in system
 
     def test_il_testo_utente_e_un_messaggio_a_parte(self) -> None:
-        """La proprieta' per cui la funzione esiste in questa forma.
-
-        Il testo dell'utente non e' un pezzo del prompt fra gli altri: e' il
-        materiale su cui il prompt opera, e sta nel secondo messaggio. E' cosi'
-        che il provider distingue le istruzioni di prodotto da cio' che gli e'
-        stato dato in pasto, ed e' l'unica difesa strutturale che il backend ha
-        contro un testo che provi a impartire ordini.
-        """
+        """La proprieta' per cui la funzione esiste in questa forma."""
         msgs = compose(role="RUOLO", content_rules=("PRIMA",), user="TESTO UTENTE")
 
         assert len(msgs) == 2

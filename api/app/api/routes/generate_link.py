@@ -19,8 +19,7 @@ from ..sse_streaming import sse_response
 router = APIRouter(prefix="/api", tags=["generate-link"])
 logger = logging.getLogger(__name__)
 
-#Messaggi rivolti all'utente HTTP, non dominio: restano nella rotta. Non devono
-#mai contenere il testo dell'eccezione, che finirebbe nel corpo della risposta.
+#Non metteteci mai dentro il testo dell'eccezione, finirebbe nella risposta.
 _URL_TOO_LONG_DETAIL = (
     "L'indirizzo del link è troppo lungo. Incollane uno più breve e riprova."
 )
@@ -37,16 +36,12 @@ async def generate_from_link(
     client: LLMClient = Depends(get_llm_client),
     extractor: ContentExtractor = Depends(get_content_extractor),
 ) -> StreamingResponse:
-    #Tre passi e nessuna logica di dominio: il DTO e' gia' validato da Pydantic,
-    #lo use case estrae il contenuto e parla con la porta LLM, sse_response
-    #formatta. L'await esegue l'estrazione qui, dove il fallimento e' ancora
-    #traducibile in uno stato HTTP, e restituisce comunque uno stream freddo.
     try:
         chunks = await generate_from_link_service(
             str(payload.url), payload.length, extractor, client
         )
-    #InvalidLinkError sottotipa FetchError: l'except del sottotipo va per primo,
-    #altrimenti il link scartato riceverebbe il 503 dell'estrazione fallita.
+    #InvalidLinkError estende FetchError, quindi va catturata per prima o il
+    #link scartato si prende il 503 al posto del 400.
     except InvalidLinkError as exc:
         raise HTTPException(status_code=400, detail=_URL_TOO_LONG_DETAIL) from exc
     except FetchError as exc:
